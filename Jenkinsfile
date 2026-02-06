@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+    tools {
+        maven 'maven'
+        jdk 'java21'
+    }
+
     environment {
         // Credencial criada no Jenkins com o Token do Sonar
         SONAR_TOKEN = credentials('sonar-token')
@@ -18,7 +23,7 @@ pipeline {
         stage('Compilação e Testes') {
             steps {
                 // O 'verify' roda os testes de integração e o Jacoco
-                sh "./mvnw clean verify"
+                sh "mvnw clean verify"
             }
         }
 
@@ -28,7 +33,7 @@ pipeline {
                 script {
                     // 'SonarQubeServer' é o nome que você configurou no Jenkins
                     withSonarQubeEnv('SonarQubeServer') {
-                        sh "./mvnw sonar:sonar \
+                        sh "mvnw sonar:sonar \
                             -Dsonar.projectKey=bb-transferencias \
                             -Dsonar.projectName='BB - Microserviço de Transferência' \
                             -Dsonar.coverage.jacoco.xmlReportPaths=target/jacoco-report/jacoco.xml \
@@ -51,7 +56,7 @@ pipeline {
         // 5. Build do Artefato Final (Só chega aqui se a qualidade for 100%)
         stage('Build do Pacote (JAR)') {
             steps {
-                sh './mvnw package -DskipTests'
+                sh 'mvnw package -DskipTests'
             }
         }
 
