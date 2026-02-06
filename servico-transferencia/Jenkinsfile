@@ -10,6 +10,8 @@ pipeline {
         // Credencial criada no Jenkins com o Token do Sonar
         SONAR_TOKEN = credentials('sonar-token')
         TESTCONTAINERS_RYUK_DISABLED = 'true'
+        QUARKUS_DATASOURCE_DEVSERVICES_TIMEOUT = 'PT3M'
+        TESTCONTAINERS_HOST_OVERRIDE = 'host.docker.internal'
     }
 
     stages {
