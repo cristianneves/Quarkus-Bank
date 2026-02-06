@@ -37,6 +37,9 @@ pipeline {
                     -Dquarkus.datasource.jdbc.url=${env.DB_URL} \
                     -Dquarkus.datasource.username=quarkus \
                     -Dquarkus.datasource.password=quarkus
+                    -Dquarkus.hibernate-orm.database.generation=drop-and-create \
+                    -Dquarkus.kafka.devservices.enabled=false \
+                    -Dkafka.bootstrap.servers=172.17.0.1:9092
                     """
                 }
             }
