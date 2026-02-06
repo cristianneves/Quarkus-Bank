@@ -65,7 +65,11 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 dir('servico-transferencia') {
-                    sh "docker build -f src/main/docker/Dockerfile.jvm -t bb/servico-transferencia:${env.BRANCH_NAME} ."
+                    script {
+                        def dockerTag = env.BRANCH_NAME.replaceAll("/", "-")
+
+                        sh "docker build -f src/main/docker/Dockerfile.jvm -t bb/servico-transferencia:${dockerTag} ."
+                    }
                 }
             }
         }
