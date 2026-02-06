@@ -9,6 +9,7 @@ pipeline {
     environment {
         // Credencial criada no Jenkins com o Token do Sonar
         SONAR_TOKEN = credentials('sonar-token')
+        TESTCONTAINERS_RYUK_DISABLED = 'true'
     }
 
     stages {
