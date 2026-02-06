@@ -22,22 +22,23 @@ pipeline {
         // 2. Compilação e Testes (Gera o relatório Jacoco para o Sonar)
         stage('Compilação e Testes') {
             steps {
-                // O 'verify' roda os testes de integração e o Jacoco
-                sh "mvn clean verify"
+                dir('servico-transferencia') {
+                    sh "mvn clean verify"
+                }
             }
         }
 
         // 3. Análise SonarQube (Envia os resultados dos testes e cobertura)
         stage('Análise SonarQube') {
             steps {
-                script {
-                    // 'SonarQubeServer' é o nome que você configurou no Jenkins
-                    withSonarQubeEnv('SonarQubeServer') {
-                        sh "mvn sonar:sonar \
-                            -Dsonar.projectKey=bb-transferencias \
-                            -Dsonar.projectName='BB - Microserviço de Transferência' \
-                            -Dsonar.coverage.jacoco.xmlReportPaths=target/jacoco-report/jacoco.xml \
-                            -Dsonar.branch.name=${env.BRANCH_NAME}"
+                dir('servico-transferencia') {
+                    script {
+                        withSonarQubeEnv('SonarQubeServer') {
+                            sh "mvn sonar:sonar \
+                                -Dsonar.projectKey=bb-transferencias \
+                                -Dsonar.projectName='BB - Microserviço de Transferência' \
+                                -Dsonar.coverage.jacoco.xmlReportPaths=target/jacoco-report/jacoco.xml"
+                        }
                     }
                 }
             }
@@ -56,15 +57,16 @@ pipeline {
         // 5. Build do Artefato Final (Só chega aqui se a qualidade for 100%)
         stage('Build do Pacote (JAR)') {
             steps {
-                sh 'mvn package -DskipTests'
+                dir('servico-transferencia') {
+                    sh 'mvn package -DskipTests'
+                }
             }
         }
 
         // 6. Criação da Imagem Docker
         stage('Build Docker Image') {
             steps {
-                script {
-                    // Usa o Dockerfile que o Quarkus gera automaticamente
+                dir('servico-transferencia') {
                     sh "docker build -f src/main/docker/Dockerfile.jvm -t bb/servico-transferencia:${env.BRANCH_NAME} ."
                 }
             }
