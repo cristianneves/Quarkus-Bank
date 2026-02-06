@@ -4,11 +4,18 @@ import br.com.bb.transacoes.dto.TransferenciaDTO;
 import br.com.bb.transacoes.exception.BusinessException;
 import br.com.bb.transacoes.model.Conta;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.WebApplicationException;
+import org.eclipse.microprofile.reactive.messaging.Channel;
+import org.eclipse.microprofile.reactive.messaging.Emitter;
 
 @ApplicationScoped
 public class TransferenciaService {
+
+    @Inject
+    @Channel("transferencias-concluidas")
+    Emitter<TransferenciaDTO> emissorTransferencia;
 
     @Transactional
     public void realizarTransferencia(TransferenciaDTO dto) {
@@ -26,5 +33,6 @@ public class TransferenciaService {
         origem.saldo = origem.saldo.subtract(dto.valor());
         destino.saldo = destino.saldo.add(dto.valor());
 
+        emissorTransferencia.send(dto);
     }
 }
