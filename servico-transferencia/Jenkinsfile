@@ -1,56 +1,59 @@
 pipeline {
     agent any
-
-    tools {
-        maven 'maven'
-        // jdk 'java21'
-    }
+    tools { maven 'maven' }
 
     environment {
-        // Credencial criada no Jenkins com o Token do Sonar
         SONAR_TOKEN = credentials('sonar-token')
-        TESTCONTAINERS_RYUK_DISABLED = 'true'
-        TESTCONTAINERS_HOST_OVERRIDE = 'host.docker.internal'
-
-        QUARKUS_DATASOURCE_DEVSERVICES_TIMEOUT = 'PT5M'
-        QUARKUS_KAFKA_DEVSERVICES_TIMEOUT = 'PT5M'
+        // 🚀 Desativamos a orquestração automática que está travando
+        QUARKUS_DEVSERVICES_ENABLED = 'false'
+        DB_URL = 'jdbc:postgresql://172.17.0.1:5432/transacoes' // IP padrão do Gateway Docker
     }
 
     stages {
-        // 1. O Checkout Dinâmico (Usa a branch que disparou o build)
         stage('Checkout') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
 
-        // 2. Compilação e Testes (Gera o relatório Jacoco para o Sonar)
-        stage('Compilação e Testes') {
+        // 🚀 NOVO ESTÁGIO: Garantir o Banco de Dados de pé
+        stage('Prepare DB') {
             steps {
-                dir('servico-transferencia') {
-                    // Passamos o timeout diretamente como propriedade do sistema
-                    sh "mvn clean verify -Dquarkus.datasource.devservices.timeout=300"
+                script {
+                    // Remove qualquer container antigo para não dar conflito de nome
+                    sh "docker rm -f pg-test || true"
+                    // Sobe o Postgres manualmente
+                    sh "docker run -d --name pg-test -e POSTGRES_USER=quarkus -e POSTGRES_PASSWORD=quarkus -e POSTGRES_DB=transacoes -p 5432:5432 postgres:17"
+                    // Aguarda 10 segundos para o banco respirar
+                    sleep 10
                 }
             }
         }
 
-        // 3. Análise SonarQube (Envia os resultados dos testes e cobertura)
+        stage('Compilação e Testes') {
+            steps {
+                dir('servico-transferencia') {
+                    // 🚀 Passamos as credenciais do banco manual diretamente para o Quarkus
+                    sh """
+                    mvn clean verify \
+                    -Dquarkus.datasource.jdbc.url=${env.DB_URL} \
+                    -Dquarkus.datasource.username=quarkus \
+                    -Dquarkus.datasource.password=quarkus
+                    """
+                }
+            }
+        }
+
         stage('Análise SonarQube') {
             steps {
                 dir('servico-transferencia') {
                     script {
                         withSonarQubeEnv('SonarQubeServer') {
-                            sh "mvn sonar:sonar \
-                                -Dsonar.projectKey=bb-transferencias \
-                                -Dsonar.projectName='BB - Microserviço de Transferência' \
-                                -Dsonar.coverage.jacoco.xmlReportPaths=target/jacoco-report/jacoco.xml"
+                            sh "mvn sonar:sonar -Dsonar.projectKey=bb-transferencias"
                         }
                     }
                 }
             }
         }
 
-        // 4. Quality Gate (O Jenkins espera o veredito do Sonar)
         stage('Quality Gate') {
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
@@ -80,11 +83,9 @@ pipeline {
     }
 
     post {
-        success {
-            echo '✅ Build e Análise concluídos com sucesso!'
-        }
-        failure {
-            echo '❌ Falha na pipeline. Verifique os testes ou o Quality Gate no Sonar.'
+        always {
+            // 🚀 Limpeza: Não deixa lixo no Docker do seu Windows
+            sh "docker rm -f pg-test || true"
         }
     }
 }
