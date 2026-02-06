@@ -4,9 +4,9 @@ pipeline {
 
     environment {
         SONAR_TOKEN = credentials('sonar-token')
-        // 🚀 Desativamos a orquestração automática que está travando
         QUARKUS_DEVSERVICES_ENABLED = 'false'
-        DB_URL = 'jdbc:postgresql://172.17.0.1:5432/transacoes' // IP padrão do Gateway Docker
+        // 🚀 Mudamos para 5435 para fugir do conflito com o seu Postgres local
+        DB_URL = 'jdbc:postgresql://172.17.0.1:5435/transacoes'
     }
 
     stages {
@@ -14,15 +14,12 @@ pipeline {
             steps { checkout scm }
         }
 
-        // 🚀 NOVO ESTÁGIO: Garantir o Banco de Dados de pé
         stage('Prepare DB') {
             steps {
                 script {
-                    // Remove qualquer container antigo para não dar conflito de nome
+                    // Limpa containers antigos e sobe na porta 5435
                     sh "docker rm -f pg-test || true"
-                    // Sobe o Postgres manualmente
-                    sh "docker run -d --name pg-test -e POSTGRES_USER=quarkus -e POSTGRES_PASSWORD=quarkus -e POSTGRES_DB=transacoes -p 5432:5432 postgres:17"
-                    // Aguarda 10 segundos para o banco respirar
+                    sh "docker run -d --name pg-test -e POSTGRES_USER=quarkus -e POSTGRES_PASSWORD=quarkus -e POSTGRES_DB=transacoes -p 5435:5432 postgres:17"
                     sleep 10
                 }
             }
@@ -31,16 +28,8 @@ pipeline {
         stage('Compilação e Testes') {
             steps {
                 dir('servico-transferencia') {
-                    // 🚀 Passamos as credenciais do banco manual diretamente para o Quarkus
-                    sh """
-                    mvn clean verify \
-                    -Dquarkus.datasource.jdbc.url=${env.DB_URL} \
-                    -Dquarkus.datasource.username=quarkus \
-                    -Dquarkus.datasource.password=quarkus
-                    -Dquarkus.hibernate-orm.database.generation=drop-and-create \
-                    -Dquarkus.kafka.devservices.enabled=false \
-                    -Dkafka.bootstrap.servers=172.17.0.1:9092
-                    """
+                    // 🚀 Comando em linha única para garantir que o Maven leia TODOS os parâmetros
+                    sh "mvn clean verify -Dquarkus.datasource.jdbc.url=${env.DB_URL} -Dquarkus.datasource.username=quarkus -Dquarkus.datasource.password=quarkus -Dquarkus.hibernate-orm.database.generation=drop-and-create -Dquarkus.kafka.devservices.enabled=false"
                 }
             }
         }
@@ -60,13 +49,11 @@ pipeline {
         stage('Quality Gate') {
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
-                    // Aborta se a cobertura for baixa ou houver bugs críticos
                     waitForQualityGate abortPipeline: true
                 }
             }
         }
 
-        // 5. Build do Artefato Final (Só chega aqui se a qualidade for 100%)
         stage('Build do Pacote (JAR)') {
             steps {
                 dir('servico-transferencia') {
@@ -75,7 +62,6 @@ pipeline {
             }
         }
 
-        // 6. Criação da Imagem Docker
         stage('Build Docker Image') {
             steps {
                 dir('servico-transferencia') {
@@ -87,7 +73,6 @@ pipeline {
 
     post {
         always {
-            // 🚀 Limpeza: Não deixa lixo no Docker do seu Windows
             sh "docker rm -f pg-test || true"
         }
     }
