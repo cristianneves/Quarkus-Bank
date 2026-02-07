@@ -2,6 +2,7 @@ package br.com.bb.transacoes;
 
 import br.com.bb.transacoes.dto.TransferenciaDTO;
 import br.com.bb.transacoes.model.Conta;
+import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.security.TestSecurity;
 import io.restassured.http.ContentType;
@@ -19,25 +20,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @QuarkusTest
 public class TransferenciaResourceTest {
 
-
-    @BeforeEach
-    @Transactional
-    void setup() {
-        // Garante que a conta de origem sempre comece com 1000.00 antes de cada @Test
-        Conta origem = Conta.findByNumero("12345-6");
-        if (origem != null) {
-            origem.saldo = new BigDecimal("1000.00");
-            origem.persist();
-        }
-        Conta destino = Conta.findByNumero("54321-0");
-        if (destino != null) {
-            destino.saldo = new BigDecimal("500.50");
-            destino.persist();
-        }
-    }
-
     @Test
     @TestSecurity(user = "crislan", roles = "user")
+    @TestTransaction
     @DisplayName("Deve falhar ao realizar transferencia com um valor negativo")
     public void deveRetornarErroAoTransferirValorNegativo() {
         String corpoRequest = """
@@ -59,6 +44,7 @@ public class TransferenciaResourceTest {
 
     @Test
     @TestSecurity(user = "crislan", roles = "user")
+    @TestTransaction
     @DisplayName("Deve realizar uma transferência entre duas contas com sucesso")
     public void deveRealizarTransferenciaComSucesso() {
         // 1. Preparar os dados (Baseado no seu import.sql)
