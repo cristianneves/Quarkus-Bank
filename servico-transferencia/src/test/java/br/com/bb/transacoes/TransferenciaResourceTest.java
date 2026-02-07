@@ -3,6 +3,7 @@ package br.com.bb.transacoes;
 import br.com.bb.transacoes.dto.TransferenciaDTO;
 import br.com.bb.transacoes.model.Conta;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.security.TestSecurity;
 import io.restassured.http.ContentType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class TransferenciaResourceTest {
 
     @Test
+    @TestSecurity(user = "crislan", roles = "user")
     @DisplayName("Deve falhar ao realizar transferencia com um valor negativo")
     public void deveRetornarErroAoTransferirValorNegativo() {
         String corpoRequest = """
@@ -37,6 +39,7 @@ public class TransferenciaResourceTest {
     }
 
     @Test
+    @TestSecurity(user = "crislan", roles = "user")
     @DisplayName("Deve realizar uma transferência entre duas contas com sucesso")
     public void deveRealizarTransferenciaComSucesso() {
         // 1. Preparar os dados (Baseado no seu import.sql)
