@@ -3,6 +3,7 @@ package br.com.bb.transacoes.rest;
 import br.com.bb.transacoes.dto.TransferenciaDTO;
 import br.com.bb.transacoes.model.Conta;
 import br.com.bb.transacoes.service.TransferenciaService;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.GET;
@@ -28,6 +29,7 @@ public class ContaResource {
 
     @POST
     @Path("/transferir")
+    @RolesAllowed("user")
     public Response transferir(@Valid TransferenciaDTO dto){
         service.realizarTransferencia(dto);
         return Response.status(Response.Status.OK).build();
