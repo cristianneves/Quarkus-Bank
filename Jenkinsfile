@@ -1,6 +1,11 @@
 pipeline {
 	agent any
 
+	tools {
+		// O nome aqui deve ser IDÊNTICO ao que você colocou no Passo 1
+		maven 'maven'
+	}
+
 	environment {
 		SONAR_TOKEN = credentials('sonar-token')
 		// 🚀 IPs para o Jenkins (que está dentro do Docker) falar com os serviços
