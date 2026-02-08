@@ -9,8 +9,8 @@ pipeline {
 	environment {
 		SONAR_TOKEN = credentials('sonar-token')
 		// 🚀 IPs para o Jenkins (que está dentro do Docker) falar com os serviços
-		DB_URL = "jdbc:postgresql://postgres-db:5499/bank_db"
-		KAFKA_HOST = "redpanda-estavel:9092"
+		DB_URL = "jdbc:postgresql://postgres-db:5432/bank_db"
+		OIDC_URL = "http://keycloak-estavel:8080/realms/bank-realm"
 	}
 
 	stages {
@@ -23,8 +23,7 @@ pipeline {
 		stage('Build & Test: Cadastro') {
 			steps {
 				dir('servico-cadastro') {
-					sh "mvn clean verify -Dquarkus.datasource.jdbc.url=${env.DB_URL} -Dquarkus.datasource.username=quarkus -Dquarkus.datasource.password=quarkus -Dquarkus.hibernate-orm.database.generation=update"
-				}
+					sh "mvn clean verify -Dquarkus.datasource.jdbc.url=${env.DB_URL} -Dquarkus.oidc.auth-server-url=${env.OIDC_URL} -Dquarkus.datasource.username=quarkus -Dquarkus.datasource.password=quarkus -Dquarkus.hibernate-orm.database.generation=update"				}
 			}
 		}
 
