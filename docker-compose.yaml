@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: quarkus
       POSTGRES_DB: bank_db
     ports:
-      - "127.0.0.1:5499:5432"
+      - "5499:5432"
     networks:
       - bank-network
 

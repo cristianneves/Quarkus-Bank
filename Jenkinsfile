@@ -9,8 +9,8 @@ pipeline {
 	environment {
 		SONAR_TOKEN = credentials('sonar-token')
 		// 🚀 IPs para o Jenkins (que está dentro do Docker) falar com os serviços
-		DB_URL = "jdbc:postgresql://172.17.0.1:5499/bank_db"
-		KAFKA_HOST = "172.17.0.1:9092"
+		DB_URL = "jdbc:postgresql://postgres-db:5499/bank_db"
+		KAFKA_HOST = "redpanda-estavel:9092"
 	}
 
 	stages {
