@@ -9,7 +9,7 @@ pipeline {
 	environment {
 		SONAR_TOKEN = credentials('sonar-token')
 		// 🚀 IPs para o Jenkins (que está dentro do Docker) falar com os serviços
-		DB_URL = "jdbc:postgresql://172.17.0.1:5435/bank_db"
+		DB_URL = "jdbc:postgresql://172.17.0.1:5499/bank_db"
 		KAFKA_HOST = "172.17.0.1:9092"
 	}
 
@@ -31,7 +31,7 @@ pipeline {
 		stage('Build & Test: Transferência') {
 			steps {
 				dir('servico-transferencia') {
-					sh "mvn clean verify -Dquarkus.datasource.jdbc.url=${env.DB_URL} -Dquarkus.datasource.username=quarkus -Dquarkus.datasource.password=quarkus -Dquarkus.hibernate-orm.database.generation=update -Dkafka.bootstrap.servers=${env.KAFKA_HOST}"
+					sh "mvn clean verify -Dquarkus.datasource.jdbc.url=${env.DB_URL} -Dquarkus.datasource.username=quarkus -Dquarkus.datasource.password=quarkus"
 				}
 			}
 		}
