@@ -9,7 +9,7 @@ public class Conta extends PanacheEntity {
     public String numero;
     public String agencia;
     public BigDecimal saldo;
-    public String titular;
+    public String keycloakId;
 
     public static Conta findByNumero(String numero) {
         return find("numero", numero).firstResult();
