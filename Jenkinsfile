@@ -36,11 +36,11 @@ pipeline {
 			steps {
 				dir('servico-transferencia') {
 					sh "mvn clean verify \
-                    -Dquarkus.datasource.jdbc.url=${env.URL_TRANSFERENCIA} \
-                    -Dquarkus.oidc.auth-server-url=${env.OIDC_URL} \
-                    -Dquarkus.datasource.username=${env.DB_USER} \
-                    -Dquarkus.datasource.password=${env.DB_PASS} \
-                    -Dquarkus.hibernate-orm.database.generation=update"
+                -Dquarkus.datasource.jdbc.url=${env.URL_TRANSFERENCIA} \
+                -Dkafka.bootstrap.servers=redpanda-estavel:29092 \
+                -Dquarkus.datasource.username=${env.DB_USER} \
+                -Dquarkus.datasource.password=${env.DB_PASS} \
+                -Dquarkus.hibernate-orm.database.generation=drop-and-create"
 				}
 			}
 		}
