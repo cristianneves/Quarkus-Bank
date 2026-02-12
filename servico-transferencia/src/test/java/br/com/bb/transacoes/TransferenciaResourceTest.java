@@ -6,15 +6,12 @@ import io.quarkus.test.TestTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.security.TestSecurity;
 import io.restassured.http.ContentType;
-import jakarta.transaction.Transactional;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 
 import static io.restassured.RestAssured.given;
-import static org.hamcrest.CoreMatchers.is;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @QuarkusTest
@@ -72,5 +69,7 @@ public class TransferenciaResourceTest {
 
         // 500.50 + 100.00 = 600.50
         assertEquals(0, new BigDecimal("600.50").compareTo(destino.saldo), "O saldo da conta de destino deve ser 600.50");
+
+        assertEquals("user-origem-id", origem.keycloakId, "O ID do Keycloak deve ser o mesmo do import.sql");
     }
 }
