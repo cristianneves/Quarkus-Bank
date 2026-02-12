@@ -2,7 +2,6 @@ pipeline {
 	agent any
 
 	tools {
-		// O nome aqui deve ser IDÊNTICO ao que você colocou no Passo 1
 		maven 'maven'
 	}
 
@@ -27,7 +26,7 @@ pipeline {
                     -Dquarkus.oidc.auth-server-url=${env.OIDC_URL} \
                     -Dquarkus.datasource.username=${env.DB_USER} \
                     -Dquarkus.datasource.password=${env.DB_PASS} \
-                    -Dquarkus.hibernate-orm.database.generation=update"
+                    -Dquarkus.hibernate-orm.generation=update"
 				}
 			}
 		}
@@ -36,18 +35,18 @@ pipeline {
 			steps {
 				dir('servico-transferencia') {
 					sh "mvn clean verify \
-                -Dquarkus.datasource.jdbc.url=${env.URL_TRANSFERENCIA} \
-                -Dkafka.bootstrap.servers=redpanda-estavel:29092 \
-                -Dquarkus.datasource.username=${env.DB_USER} \
-                -Dquarkus.datasource.password=${env.DB_PASS} \
-                -Dquarkus.hibernate-orm.database.generation=drop-and-create"
+                    -Dquarkus.datasource.jdbc.url=${env.URL_TRANSFERENCIA} \
+                    -Dquarkus.oidc.auth-server-url=${env.OIDC_URL} \
+                    -Dkafka.bootstrap.servers=${env.KAFKA_URL} \
+                    -Dquarkus.datasource.username=${env.DB_USER} \
+                    -Dquarkus.datasource.password=${env.DB_PASS} \
+                    -Dquarkus.hibernate-orm.generation=drop-and-create"
 				}
 			}
 		}
 
 		stage('SonarQube: Analisar Tudo') {
 			steps {
-				// Aqui rodamos a análise na raiz ou por serviço
 				dir('servico-transferencia') {
 					script {
 						withSonarQubeEnv('SonarQubeServer') {
