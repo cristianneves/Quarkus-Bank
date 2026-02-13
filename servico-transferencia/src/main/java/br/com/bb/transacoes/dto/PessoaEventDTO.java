@@ -3,9 +3,9 @@ package br.com.bb.transacoes.dto;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 @RegisterForReflection
-public class PessoaEventDTO {
-    public String keycloakId;
-    public String nome;
-    public String cpf;
-    public String email;
-}
+public record PessoaEventDTO(
+        String keycloakId,
+        String nome,
+        String cpf,
+        String email // Adicionamos o campo que você incluiu agora
+) {}
