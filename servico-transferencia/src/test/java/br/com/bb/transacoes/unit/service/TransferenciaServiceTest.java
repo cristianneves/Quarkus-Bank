@@ -71,4 +71,27 @@ public class TransferenciaServiceTest {
             verify(emissorTransferencia, never()).send(any(TransferenciaDTO.class));
         }
     }
+
+    @Test
+    @DisplayName("Deve falhar quando a conta de destino não existe")
+    public void deveFalharQuandoDestinoNaoExiste() {
+        try (MockedStatic<Conta> contaMock = mockStatic(Conta.class)) {
+            // GIVEN: Origem válida, Destino nulo
+            Conta origem = new Conta("12345-6", new BigDecimal("1000.00"));
+            TransferenciaDTO dto = new TransferenciaDTO("12345-6", "99999-9", new BigDecimal("100.00"));
+
+            contaMock.when(() -> Conta.findByNumero("12345-6")).thenReturn(origem);
+            contaMock.when(() -> Conta.findByNumero("99999-9")).thenReturn(null);
+
+            // WHEN & THEN
+            BusinessException ex = assertThrows(BusinessException.class, () -> {
+                service.realizarTransferencia(dto);
+            });
+
+            assertEquals("Conta nao encontrada", ex.getMessage());
+
+            // Verificação Sênior: Se o destino não existe, nada deve ser enviado ao Kafka
+            verify(emissorTransferencia, never()).send(any(TransferenciaDTO.class));
+        }
+    }
 }
