@@ -50,7 +50,11 @@ pipeline {
 				dir('servico-transferencia') {
 					script {
 						withSonarQubeEnv('SonarQubeServer') {
-							sh "mvn sonar:sonar -Dsonar.projectKey=bb-transferencias"
+							// 🚀 Ajuste Sênior: Passando os caminhos de cobertura e binários explicitamente
+							sh "mvn sonar:sonar \
+							-Dsonar.projectKey=bb-transferencias \
+							-Dsonar.java.binaries=target/classes \
+							-Dsonar.coverage.jacoco.xmlReportPaths=target/target/jacoco-reports/jacoco.xml"
 						}
 					}
 				}
