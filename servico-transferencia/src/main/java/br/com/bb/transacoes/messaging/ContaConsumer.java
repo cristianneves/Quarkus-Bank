@@ -9,28 +9,27 @@ import org.eclipse.microprofile.reactive.messaging.Incoming;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Random;
+import java.security.SecureRandom;
 
 @ApplicationScoped
 public class ContaConsumer {
 
+    private static final SecureRandom RANDOM = new SecureRandom();
+
     @Incoming("pessoa-registrada")
     @Transactional
     public void criarContaAoCadastrarPessoa(PessoaEventDTO evento) {
-        // 🚀 Acesso via métodos () do Java Record
         Log.infof("Recebendo evento de novo cliente: %s", evento.nome());
 
         Conta novaConta = new Conta();
-
-        // 🚀 Acesso via métodos () do Java Record
         novaConta.keycloakId = evento.keycloakId();
-
         novaConta.agencia = "0001";
-        novaConta.numero = String.valueOf(new Random().nextInt(90000) + 10000);
+
+        // 🚀 Uso do SecureRandom reusado
+        novaConta.numero = String.valueOf(RANDOM.nextInt(90000) + 10000);
         novaConta.saldo = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
 
         novaConta.persist();
-
         Log.infof("Conta %s criada com sucesso para o ID: %s", novaConta.numero, evento.keycloakId());
     }
 }

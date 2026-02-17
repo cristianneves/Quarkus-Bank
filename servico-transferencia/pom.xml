@@ -17,8 +17,12 @@
         <skipITs>true</skipITs>
         <surefire-plugin.version>3.5.4</surefire-plugin.version>
         <sonar.host.url>http://localhost:9000</sonar.host.url>
-        <sonar.login>squ_6c9ec95952a707e7a5102e54efb4809c7017fe49</sonar.login>
         <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/jacoco-reports/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+        <sonar.exclusions>
+            src/main/java/br/com/bb/transacoes/model/**,
+            src/main/java/br/com/bb/transacoes/serialization/**,
+            src/main/java/br/com/bb/transacoes/dto/**
+        </sonar.exclusions>
     </properties>
 
     <dependencyManagement>
