@@ -84,5 +84,17 @@ pipeline {
 			}
 		}
 
+		/* ESTÁGIO COMENTADO PARA POUPAR ESPAÇO EM DISCO
+       stage('Docker: Build (Pausado)') {
+          steps {
+             script {
+                echo "Estágio de criação de imagens Docker desativado para economizar armazenamento."
+                // dir('servico-cadastro') { sh "docker build -t bb-bank/servico-cadastro:latest ." }
+                // dir('servico-transferencia') { sh "docker build -t bb-bank/servico-transferencia:latest ." }
+             }
+          }
+       }
+       */
+
 	}
 }
