@@ -53,7 +53,7 @@ pipeline {
 						dir('servico-cadastro') {
 							sh "mvn sonar:sonar \
                         -Dsonar.projectKey=bb-cadastro \
-                        -Dsonar.projectName='Banco do Brasil - Cadastro' \
+                        -Dsonar.projectName='Quarkus Bank - Cadastro' \
                         -Dsonar.java.binaries=target/classes \
                         -Dsonar.coverage.jacoco.xmlReportPaths=target/jacoco-reports/jacoco.xml"
 						}
@@ -62,7 +62,7 @@ pipeline {
 						dir('servico-transferencia') {
 							sh "mvn sonar:sonar \
                         -Dsonar.projectKey=bb-transferencias \
-                        -Dsonar.projectName='Banco do Brasil - Transferências' \
+                        -Dsonar.projectName='Quarkus Bank - Transferências' \
                         -Dsonar.java.binaries=target/classes \
                         -Dsonar.coverage.jacoco.xmlReportPaths=target/jacoco-reports/jacoco.xml"
 						}
@@ -70,5 +70,19 @@ pipeline {
 				}
 			}
 		}
+
+		stage("Check Quality Gate") {
+			steps {
+				script {
+					timeout(time: 1, unit: 'HOURS') {
+						def qg = waitForQualityGate()
+						if (qg.status != 'OK') {
+							error "❌ Quality Gate falhou: ${qg.status}. O build foi abortado para proteger a produção!"
+						}
+					}
+				}
+			}
+		}
+
 	}
 }
