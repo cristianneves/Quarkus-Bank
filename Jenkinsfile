@@ -45,16 +45,26 @@ pipeline {
 			}
 		}
 
-		stage('SonarQube: Analisar Tudo') {
+		stage('SonarQube: Análise de Qualidade') {
 			steps {
-				dir('servico-transferencia') {
-					script {
-						withSonarQubeEnv('SonarQubeServer') {
-							// 🚀 Ajuste Sênior: Passando os caminhos de cobertura e binários explicitamente
+				script {
+					withSonarQubeEnv('SonarQubeServer') {
+						// 1. Analisar Serviço de Cadastro
+						dir('servico-cadastro') {
 							sh "mvn sonar:sonar \
-							-Dsonar.projectKey=bb-transferencias \
-							-Dsonar.java.binaries=target/classes \
-							-Dsonar.coverage.jacoco.xmlReportPaths=target/target/jacoco-reports/jacoco.xml"
+                        -Dsonar.projectKey=bb-cadastro \
+                        -Dsonar.projectName='Banco do Brasil - Cadastro' \
+                        -Dsonar.java.binaries=target/classes \
+                        -Dsonar.coverage.jacoco.xmlReportPaths=target/jacoco-reports/jacoco.xml"
+						}
+
+						// 2. Analisar Serviço de Transferência
+						dir('servico-transferencia') {
+							sh "mvn sonar:sonar \
+                        -Dsonar.projectKey=bb-transferencias \
+                        -Dsonar.projectName='Banco do Brasil - Transferências' \
+                        -Dsonar.java.binaries=target/classes \
+                        -Dsonar.coverage.jacoco.xmlReportPaths=target/jacoco-reports/jacoco.xml"
 						}
 					}
 				}
