@@ -35,10 +35,8 @@ public class TransferenciaServiceTest extends BaseIntegrationTest {
     void setupGlobalMocks() {
         PanacheMock.mock(Conta.class);
         PanacheMock.mock(Transferencia.class);
-        // O mock do jwt já é tratado no @BeforeEach da BaseIntegrationTest
     }
 
-    // 🏗️ Métodos de fábrica usando as constantes da Base
     private TransferenciaDTO criarDTO(BigDecimal valor) {
         return new TransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO, valor, UUID.randomUUID().toString());
     }
@@ -56,7 +54,7 @@ public class TransferenciaServiceTest extends BaseIntegrationTest {
         when(Conta.findByNumeroWithLock(destino.numero)).thenReturn(destino);
     }
 
-    // 🧪 Seus testes originais
+
     @Test
     @DisplayName("Deve transferir com sucesso")
     public void deveTransferirComSucesso() {

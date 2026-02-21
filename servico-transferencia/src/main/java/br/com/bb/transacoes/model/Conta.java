@@ -1,6 +1,7 @@
 package br.com.bb.transacoes.model;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntity;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.LockModeType;
 
@@ -11,6 +12,8 @@ public class Conta extends PanacheEntity {
     public String numero;
     public String agencia;
     public BigDecimal saldo;
+
+    @Column(unique = true, nullable = false)
     public String keycloakId;
 
     public Conta() {} // Obrigatório para o Hibernate

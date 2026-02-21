@@ -21,6 +21,13 @@ public class ContaConsumer {
     public void criarContaAoCadastrarPessoa(PessoaEventDTO evento) {
         Log.infof("Recebendo evento de novo cliente: %s", evento.nome());
 
+        boolean jaExiste = Conta.find("keycloakId", evento.keycloakId()).count() > 0;
+
+        if (jaExiste) {
+            Log.warnf("Conta ignorada: ID %s já possui uma conta ativa.", evento.keycloakId());
+            return; // Sai sem criar duplicata
+        }
+
         Conta novaConta = new Conta();
         novaConta.keycloakId = evento.keycloakId();
         novaConta.agencia = "0001";

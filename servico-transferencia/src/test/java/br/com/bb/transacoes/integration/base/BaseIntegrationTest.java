@@ -1,5 +1,6 @@
 package br.com.bb.transacoes.integration.base;
 
+import br.com.bb.transacoes.base.TestConstants;
 import io.restassured.RestAssured;
 import io.restassured.builder.RequestSpecBuilder;
 import io.restassured.http.ContentType;
@@ -8,19 +9,10 @@ import io.quarkus.test.InjectMock;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 
-import java.math.BigDecimal;
-
 import static org.mockito.Mockito.when;
 
-public abstract class BaseIntegrationTest {
+public abstract class BaseIntegrationTest implements TestConstants {
 
-    // 1. 🏗️ CONSTANTES GLOBAIS: Centralizadas para todos os testes
-    protected static final String USER_ID = "user-origem-id";
-    protected static final String CONTA_ORIGEM = "12345-6";
-    protected static final String CONTA_DESTINO = "54321-0";
-    protected static final BigDecimal SALDO_PADRAO = new BigDecimal("1000.00");
-
-    // 2. 🛡️ SHARED MOCK: Quase todo teste de integração precisará do JWT
     @InjectMock
     protected JsonWebToken jwt;
 
@@ -37,13 +29,10 @@ public abstract class BaseIntegrationTest {
 
     @BeforeEach
     public void setupIdentity() {
-        // 🚀 Visão Sênior: Por padrão, todo teste assume o usuário logado padrão
-        // Isso remove a necessidade de fazer when(jwt.getSubject()) em cada teste
         when(jwt.getSubject()).thenReturn(USER_ID);
     }
 
-    // 3. 🛠️ HELPERS: Métodos utilitários comuns
     protected String getCpfFake() {
-        return "49721758064"; // CPF válido para evitar erros de validação
+        return "49721758064";
     }
 }
