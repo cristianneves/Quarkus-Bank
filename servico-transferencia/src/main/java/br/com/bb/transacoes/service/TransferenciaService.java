@@ -3,15 +3,21 @@ package br.com.bb.transacoes.service;
 import br.com.bb.transacoes.dto.TransferenciaDTO;
 import br.com.bb.transacoes.exception.BusinessException;
 import br.com.bb.transacoes.model.Conta;
+import br.com.bb.transacoes.model.Transferencia;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
-import jakarta.ws.rs.WebApplicationException;
+import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
 
+import java.time.LocalDateTime;
+
 @ApplicationScoped
 public class TransferenciaService {
+
+    @Inject
+    JsonWebToken jwt; // 🔑 A chave da segurança: Identidade de quem chama
 
     @Inject
     @Channel("transferencias-concluidas")
@@ -19,20 +25,49 @@ public class TransferenciaService {
 
     @Transactional
     public void realizarTransferencia(TransferenciaDTO dto) {
-
-        Conta origem = Conta.findByNumero(dto.numeroOrigem());
-        Conta destino = Conta.findByNumero(dto.numeroDestino());
-
-        if (origem == null || destino == null){
-            throw new BusinessException("Conta nao encontrada");
+        // Verificação de Idempotência
+        Transferencia jaProcessada = Transferencia.findByIdempotencyKey(dto.idempotencyKey());
+        if (jaProcessada != null) {
+            // Se já existe, apenas ignoramos ou retornamos o recibo.
+            // Em bancos, retornar Sucesso (201/200) é a prática para evitar erros no App.
+            return;
         }
+
+        // 1. Busca as contas
+        Conta origem = Conta.findByNumeroWithLock(dto.numeroOrigem());
+        Conta destino = Conta.findByNumeroWithLock(dto.numeroDestino());
+
+        if (origem == null || destino == null) {
+            throw new BusinessException("Conta de origem ou destino não encontrada.");
+        }
+
+        // 2. VALIDAÇÃO DE SEGURANÇA
+        // Verificamos se o 'sub' do Token é igual ao 'keycloakId' da conta de origem
+        String callerId = jwt.getSubject();
+        if (!origem.keycloakId.equals(callerId)) {
+            throw new BusinessException("Você não tem permissão para transferir desta conta.");
+        }
+
+        // 3. Validação de Saldo
         if (origem.saldo.compareTo(dto.valor()) < 0) {
-            throw new BusinessException("Saldo Insuficiente");
+            throw new BusinessException("Saldo insuficiente.");
         }
 
+        // 4. Execução Financeira (Débito e Crédito)
         origem.saldo = origem.saldo.subtract(dto.valor());
         destino.saldo = destino.saldo.add(dto.valor());
 
+        // 5. REGISTRO DE AUDITORIA (Persistindo o histórico)
+        Transferencia historico = new Transferencia();
+        historico.numeroOrigem = dto.numeroOrigem();
+        historico.numeroDestino = dto.numeroDestino();
+        historico.valor = dto.valor();
+        historico.dataHora = LocalDateTime.now();
+        historico.status = "CONCLUIDA";
+        historico.idempotencyKey = dto.idempotencyKey();
+        historico.persist(); // Salva no banco de transações
+
+        // 6. Notificação para o Ecossistema (Kafka)
         emissorTransferencia.send(dto);
     }
 }
