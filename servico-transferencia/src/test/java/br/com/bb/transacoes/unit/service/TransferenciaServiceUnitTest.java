@@ -5,7 +5,7 @@ import br.com.bb.transacoes.exception.BusinessException;
 import br.com.bb.transacoes.model.Conta;
 import br.com.bb.transacoes.service.TransferenciaService;
 import br.com.bb.transacoes.unit.base.BaseUnitTest;
-import br.com.bb.transacoes.unit.base.TestDataFactory;
+import br.com.bb.transacoes.base.TestDataFactory;
 import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.reactive.messaging.memory.InMemoryConnector;
 import io.smallrye.reactive.messaging.memory.InMemorySink;

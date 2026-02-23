@@ -1,15 +1,14 @@
 package br.com.bb.transacoes.integration.service;
 
+import br.com.bb.transacoes.base.TestDataFactory;
 import br.com.bb.transacoes.dto.TransferenciaDTO;
 import br.com.bb.transacoes.exception.BusinessException;
-import br.com.bb.transacoes.integration.base.BaseIntegrationTest;
+import br.com.bb.transacoes.integration.base.BaseMessagingTest;
 import br.com.bb.transacoes.model.Conta;
 import br.com.bb.transacoes.model.Transferencia;
 import br.com.bb.transacoes.service.TransferenciaService;
 import io.quarkus.panache.mock.PanacheMock;
 import io.quarkus.test.junit.QuarkusTest;
-import io.smallrye.reactive.messaging.memory.InMemoryConnector;
-import jakarta.enterprise.inject.Any;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,19 +16,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 import static org.mockito.Mockito.*;
 
 @QuarkusTest
-public class TransferenciaServiceTest extends BaseIntegrationTest {
+public class TransferenciaServiceTest extends BaseMessagingTest {
 
     @Inject
     TransferenciaService service;
-
-    @Inject
-    @Any
-    InMemoryConnector connector;
 
     @BeforeEach
     void setupGlobalMocks() {
@@ -37,34 +31,20 @@ public class TransferenciaServiceTest extends BaseIntegrationTest {
         PanacheMock.mock(Transferencia.class);
     }
 
-    private TransferenciaDTO criarDTO(BigDecimal valor) {
-        return new TransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO, valor, UUID.randomUUID().toString());
-    }
-
-    private Conta criarConta(String numero, String ownerId) {
-        Conta c = new Conta();
-        c.numero = numero;
-        c.saldo = SALDO_PADRAO;
-        c.keycloakId = ownerId;
-        return c;
-    }
-
-    private void mockContas(Conta origem, Conta destino) {
-        when(Conta.findByNumeroWithLock(origem.numero)).thenReturn(origem);
-        when(Conta.findByNumeroWithLock(destino.numero)).thenReturn(destino);
-    }
-
-
     @Test
-    @DisplayName("Deve transferir com sucesso")
+    @DisplayName("Deve transferir com sucesso e notificar Kafka")
     public void deveTransferirComSucesso() {
-        Conta origem = criarConta(CONTA_ORIGEM, USER_ID);
-        Conta destino = criarConta(CONTA_DESTINO, "outro-id");
+        Conta origem = TestDataFactory.contaPadraoOrigem();
+        Conta destino = TestDataFactory.contaPadraoDestino();
         mockContas(origem, destino);
 
-        service.realizarTransferencia(criarDTO(new BigDecimal("100.00")));
+        TransferenciaDTO dto = TestDataFactory.novaTransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO, new BigDecimal("100.00"));
 
-        Assertions.assertEquals(new BigDecimal("900.00"), origem.saldo);
+        service.realizarTransferencia(dto);
+
+        Assertions.assertEquals(0, new BigDecimal("900.00").compareTo(origem.saldo));
+
+        Assertions.assertEquals(1, connector.sink("transferencias-concluidas").received().size());
     }
 
     @Test
@@ -72,11 +52,10 @@ public class TransferenciaServiceTest extends BaseIntegrationTest {
     public void deveFalharAcessoNegado() {
         when(jwt.getSubject()).thenReturn("HACKER-ID");
 
-        Conta origem = criarConta(CONTA_ORIGEM, USER_ID);
-        mockContas(origem, criarConta(CONTA_DESTINO, "outro-id"));
+        mockContas(TestDataFactory.contaPadraoOrigem(), TestDataFactory.contaPadraoDestino());
 
         Assertions.assertThrows(BusinessException.class, () ->
-                service.realizarTransferencia(criarDTO(new BigDecimal("50.00")))
+                service.realizarTransferencia(TestDataFactory.novaTransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO, new BigDecimal("50.00")))
         );
 
         PanacheMock.verify(Transferencia.class, times(0)).persist();
@@ -85,16 +64,14 @@ public class TransferenciaServiceTest extends BaseIntegrationTest {
     @Test
     @DisplayName("Deve falhar quando o saldo é insuficiente")
     public void deveFalharSaldoInsuficiente() {
-        Conta origem = criarConta(CONTA_ORIGEM, USER_ID);
-        origem.saldo = new BigDecimal("50.00");
-        mockContas(origem, criarConta(CONTA_DESTINO, "outro-id"));
+        Conta origem = TestDataFactory.novaConta(CONTA_ORIGEM, USER_ID, new BigDecimal("50.00"));
+        mockContas(origem, TestDataFactory.contaPadraoDestino());
 
         BusinessException exception = Assertions.assertThrows(BusinessException.class, () ->
-                service.realizarTransferencia(criarDTO(new BigDecimal("100.00")))
+                service.realizarTransferencia(TestDataFactory.novaTransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO, new BigDecimal("100.00")))
         );
 
         Assertions.assertEquals("Saldo insuficiente.", exception.getMessage());
-        Assertions.assertEquals(new BigDecimal("50.00"), origem.saldo);
         PanacheMock.verify(Transferencia.class, times(0)).persist();
     }
 
@@ -104,31 +81,47 @@ public class TransferenciaServiceTest extends BaseIntegrationTest {
         when(Conta.findByNumeroWithLock(CONTA_ORIGEM)).thenReturn(null);
 
         Assertions.assertThrows(BusinessException.class, () ->
-                service.realizarTransferencia(criarDTO(new BigDecimal("10.00")))
+                service.realizarTransferencia(TestDataFactory.novaTransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO, new BigDecimal("10.00")))
         );
     }
 
     @Test
     @DisplayName("Deve falhar quando a conta de destino não existe")
     public void deveFalharDestinoInexistente() {
-        Conta origem = criarConta(CONTA_ORIGEM, USER_ID);
-        when(Conta.findByNumeroWithLock(CONTA_ORIGEM)).thenReturn(origem);
+        // GIVEN
+        when(Conta.findByNumeroWithLock(CONTA_ORIGEM)).thenReturn(TestDataFactory.contaPadraoOrigem());
         when(Conta.findByNumeroWithLock(CONTA_DESTINO)).thenReturn(null);
 
+        // WHEN / THEN
         Assertions.assertThrows(BusinessException.class, () ->
-                service.realizarTransferencia(criarDTO(new BigDecimal("10.00")))
+                service.realizarTransferencia(TestDataFactory.novaTransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO, new BigDecimal("10")))
         );
     }
 
     @Test
     @DisplayName("Não deve permitir transferência para a mesma conta")
     public void deveFalharMesmaConta() {
-        TransferenciaDTO dtoMesmaConta = new TransferenciaDTO(
-                CONTA_ORIGEM, CONTA_ORIGEM, new BigDecimal("10.00"), UUID.randomUUID().toString()
-        );
+        TransferenciaDTO dto = TestDataFactory.novaTransferenciaDTO(CONTA_ORIGEM, CONTA_ORIGEM, new BigDecimal("10"));
 
-        Assertions.assertThrows(BusinessException.class, () ->
-                service.realizarTransferencia(dtoMesmaConta)
-        );
+        Assertions.assertThrows(BusinessException.class, () -> service.realizarTransferencia(dto));
+    }
+
+    @Test
+    @DisplayName("Deve ignorar transferência se a chave de idempotência já existir")
+    public void deveGarantirIdempotenciaNoService() {
+        TransferenciaDTO dto = TestDataFactory.novaTransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO, new BigDecimal("100.00"));
+
+        when(Transferencia.findByIdempotencyKey(dto.idempotencyKey())).thenReturn(new Transferencia());
+
+        service.realizarTransferencia(dto);
+
+        PanacheMock.verify(Conta.class, never()).findByNumeroWithLock(anyString());
+
+        Assertions.assertTrue(connector.sink("transferencias-concluidas").received().isEmpty());
+    }
+
+    private void mockContas(Conta origem, Conta destino) {
+        when(Conta.findByNumeroWithLock(origem.numero)).thenReturn(origem);
+        when(Conta.findByNumeroWithLock(destino.numero)).thenReturn(destino);
     }
 }

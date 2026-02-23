@@ -25,37 +25,21 @@ public class TransferenciaResourceTest extends BaseIntegrationTest {
     @TestTransaction
     @DisplayName("Deve realizar uma transferência com sucesso")
     public void deveRealizarTransferenciaComSucesso() {
-        TransferenciaDTO dto = new TransferenciaDTO(
-                CONTA_ORIGEM,
-                CONTA_DESTINO,
-                new BigDecimal("100.00"),
-                UUID.randomUUID().toString()
-        );
+        TransferenciaDTO dto = criarDTO(CONTA_ORIGEM, CONTA_DESTINO, new BigDecimal("100.00"));
 
-        given()
-                .body(dto)
-                .when()
-                .post(PATH)
-                .then()
-                .statusCode(201);
+        executarPost(dto).statusCode(201);
 
-        Conta origem = Conta.find("numero", CONTA_ORIGEM).firstResult();
-        assertEquals(0, new BigDecimal("900.00").compareTo(origem.saldo));
+        validarSaldo(CONTA_ORIGEM, new BigDecimal("900.00"));
+        validarSaldo(CONTA_DESTINO, new BigDecimal("600.50"));
     }
 
     @Test
     @TestSecurity(user = USER_ID, roles = "user")
     @TestTransaction
-    @DisplayName("Deve falhar ao transferir valor maior que o saldo disponível")
+    @DisplayName("Deve falhar por saldo insuficiente")
     public void deveFalharPorSaldoInsuficiente() {
-        TransferenciaDTO dto = new TransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO, new BigDecimal("5000.00"), UUID.randomUUID().toString());
-
-        given()
-                .body(dto)
-                .when()
-                .post(PATH)
-                .then()
-                .statusCode(422); // Unprocessable Entity
+        TransferenciaDTO dto = criarDTO(CONTA_ORIGEM, CONTA_DESTINO, new BigDecimal("5000.00"));
+        executarPost(dto).statusCode(422);
     }
 
     @Test
@@ -63,14 +47,8 @@ public class TransferenciaResourceTest extends BaseIntegrationTest {
     @TestTransaction
     @DisplayName("Deve falhar quando a conta de origem não existe")
     public void deveFalharQuandoContaOrigemNaoExiste() {
-        TransferenciaDTO dto = new TransferenciaDTO("99999-9", CONTA_DESTINO, new BigDecimal("10.00"), UUID.randomUUID().toString());
-
-        given()
-                .body(dto)
-                .when()
-                .post(PATH)
-                .then()
-                .statusCode(422);
+        TransferenciaDTO dto = criarDTO("99999-9", CONTA_DESTINO, new BigDecimal("10.00"));
+        executarPost(dto).statusCode(422);
     }
 
     @Test
@@ -78,33 +56,40 @@ public class TransferenciaResourceTest extends BaseIntegrationTest {
     @TestTransaction
     @DisplayName("Deve falhar ao enviar valor negativo")
     public void deveRetornarErroAoTransferirValorNegativo() {
-        String corpoRequest = """
-            {
-                "numeroOrigem": "%s",
-                "numeroDestino": "%s",
-                "valor": -50.00,
-                "idempotencyKey": "%s"
-            }
-            """.formatted(CONTA_ORIGEM, CONTA_DESTINO, UUID.randomUUID().toString());
-
-        given()
-                .body(corpoRequest)
-                .when()
-                .post(PATH)
-                .then()
-                .statusCode(400); // Bad Request
+        TransferenciaDTO dto = criarDTO(CONTA_ORIGEM, CONTA_DESTINO, new BigDecimal("-50.00"));
+        executarPost(dto).statusCode(400);
     }
 
     @Test
     @DisplayName("Deve retornar 401 ao tentar transferir sem estar autenticado")
     public void deveRetornar401QuandoNaoAutenticado() {
-        TransferenciaDTO dto = new TransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO, new BigDecimal("10.00"), UUID.randomUUID().toString());
+        TransferenciaDTO dto = criarDTO(CONTA_ORIGEM, CONTA_DESTINO, new BigDecimal("10.00"));
+        executarPost(dto).statusCode(401);
+    }
 
-        given()
-                .body(dto)
-                .when()
-                .post(PATH)
-                .then()
-                .statusCode(401);
+    @Test
+    @TestSecurity(user = USER_ID, roles = "user")
+    @TestTransaction
+    @DisplayName("Deve retornar 400 quando o valor da transferência for 0")
+    public void deveFalharParaValorNaoPositivo() {
+        // Testamos com ZERO, que é o limite da regra @Positive
+        TransferenciaDTO dtoZero = criarDTO(CONTA_ORIGEM, CONTA_DESTINO, BigDecimal.ZERO);
+
+        executarPost(dtoZero).statusCode(400);
+    }
+
+    // --- MÉTODOS AUXILIARES (HELPERS) ---
+
+    private TransferenciaDTO criarDTO(String origem, String destino, BigDecimal valor) {
+        return new TransferenciaDTO(origem, destino, valor, UUID.randomUUID().toString());
+    }
+
+    private io.restassured.response.ValidatableResponse executarPost(Object body) {
+        return given().body(body).when().post(PATH).then();
+    }
+
+    private void validarSaldo(String numeroConta, BigDecimal saldoEsperado) {
+        Conta conta = Conta.find("numero", numeroConta).firstResult();
+        assertEquals(0, saldoEsperado.compareTo(conta.saldo));
     }
 }
