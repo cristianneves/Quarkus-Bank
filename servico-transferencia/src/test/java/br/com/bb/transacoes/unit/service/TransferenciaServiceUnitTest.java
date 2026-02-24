@@ -41,7 +41,6 @@ public class TransferenciaServiceUnitTest extends BaseUnitTest {
     void deveTransferirComSucesso() {
         TransferenciaDTO dto = new TransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO, new BigDecimal("100.00"), UUID.randomUUID().toString());
 
-        // 🛡️ Uso elegante do Object Mother
         Conta origem = TestDataFactory.contaPadraoOrigem();
         Conta destino = TestDataFactory.contaPadraoDestino();
 

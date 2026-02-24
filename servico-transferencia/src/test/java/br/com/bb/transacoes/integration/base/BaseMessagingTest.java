@@ -19,8 +19,6 @@ public abstract class BaseMessagingTest extends BaseIntegrationTest {
 
     @BeforeEach
     public void limparCanais() {
-        // 🚀 Visão Sênior: Limpa os sinks conhecidos antes de cada teste
-        // Se você tiver outros canais de saída, adicione-os aqui
         if (connector.sink("transferencias-concluidas") != null) {
             connector.sink("transferencias-concluidas").clear();
         }

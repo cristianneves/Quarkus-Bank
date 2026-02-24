@@ -72,7 +72,6 @@ public class TransferenciaResourceTest extends BaseIntegrationTest {
     @TestTransaction
     @DisplayName("Deve retornar 400 quando o valor da transferência for 0")
     public void deveFalharParaValorNaoPositivo() {
-        // Testamos com ZERO, que é o limite da regra @Positive
         TransferenciaDTO dtoZero = criarDTO(CONTA_ORIGEM, CONTA_DESTINO, BigDecimal.ZERO);
 
         executarPost(dtoZero).statusCode(400);
