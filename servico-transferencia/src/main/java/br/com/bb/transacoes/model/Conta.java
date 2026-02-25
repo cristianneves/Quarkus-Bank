@@ -16,6 +16,11 @@ public class Conta extends PanacheEntity {
     @Column(unique = true, nullable = false)
     public String keycloakId;
 
+    public String nomeTitular;
+    public String cpfTitular;
+    public String emailTitular;
+
+
     public Conta() {} // Obrigatório para o Hibernate
 
     public Conta(String numero, BigDecimal saldo) {

@@ -31,8 +31,9 @@ public class ContaConsumer {
         Conta novaConta = new Conta();
         novaConta.keycloakId = evento.keycloakId();
         novaConta.agencia = "0001";
-
-        // 🚀 Uso do SecureRandom reusado
+        novaConta.nomeTitular = evento.nome();
+        novaConta.cpfTitular = evento.cpf();
+        novaConta.emailTitular = evento.email();
         novaConta.numero = String.valueOf(RANDOM.nextInt(90000) + 10000);
         novaConta.saldo = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
 

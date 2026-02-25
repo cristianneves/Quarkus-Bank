@@ -12,7 +12,7 @@ import jakarta.ws.rs.Path;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 @Path("/api/perfil")
-@Authenticated // Exige que o usuário esteja logado
+@Authenticated
 public class PerfilResource {
 
     @Inject
