@@ -1,6 +1,7 @@
 package br.com.bb.transacoes.rest;
 
 import br.com.bb.transacoes.dto.DepositoDTO;
+import br.com.bb.transacoes.interceptor.AuditAdmin;
 import br.com.bb.transacoes.model.Conta;
 import br.com.bb.transacoes.service.TransferenciaService;
 import jakarta.annotation.security.RolesAllowed;
@@ -32,6 +33,7 @@ public class ContaResource {
     @POST
     @Path("/deposito")
     @RolesAllowed("admin")
+    @AuditAdmin
     public Response depositar(DepositoDTO dto) {
         service.depositar(dto);
         return Response.ok().build();
