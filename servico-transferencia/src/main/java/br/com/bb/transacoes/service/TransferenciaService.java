@@ -1,9 +1,11 @@
 package br.com.bb.transacoes.service;
 
+import br.com.bb.transacoes.dto.DepositoDTO;
 import br.com.bb.transacoes.dto.TransferenciaDTO;
 import br.com.bb.transacoes.exception.BusinessException;
 import br.com.bb.transacoes.model.Conta;
 import br.com.bb.transacoes.model.Transferencia;
+import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -11,6 +13,7 @@ import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @ApplicationScoped
@@ -69,5 +72,26 @@ public class TransferenciaService {
 
         // 6. Notificação para o Ecossistema (Kafka)
         emissorTransferencia.send(dto);
+    }
+
+    @Transactional
+    public void depositar(DepositoDTO dto) {
+        Log.infof("Realizando depósito de R$ %s na conta %s", dto.valor(), dto.numeroConta());
+
+        Conta conta = Conta.findByNumeroWithLock(dto.numeroConta());
+
+        if (conta == null) {
+            throw new BusinessException("Conta não encontrada para depósito.");
+        }
+
+        if (dto.valor().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("O valor do depósito deve ser positivo.");
+        }
+
+        conta.saldo = conta.saldo.add(dto.valor());
+        conta.persist();
+
+        Log.infof("Depósito realizado com sucesso. Novo saldo da conta %s: R$ %s",
+                conta.numero, conta.saldo);
     }
 }

@@ -1,6 +1,5 @@
 package br.com.bb.cadastro.rest;
 
-import org.eclipse.microprofile.jwt.JsonWebToken;
 import br.com.bb.cadastro.client.ContaClient;
 import br.com.bb.cadastro.dto.ContaDTO;
 import br.com.bb.cadastro.dto.PerfilDTO;
@@ -9,6 +8,7 @@ import io.quarkus.security.Authenticated;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
+import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 @Path("/api/perfil")
