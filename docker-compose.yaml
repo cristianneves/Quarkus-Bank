@@ -1,0 +1,108 @@
+services:
+  # Base de dados exclusiva para o Cadastro (Porto 5432)
+  db-cadastro:
+    image: postgres:17
+    container_name: db-cadastro
+    environment:
+      - POSTGRES_DB=cadastro_db
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+    ports:
+      - "5432:5432"
+    volumes:
+      - cadastro_data:/var/lib/postgresql/data
+    networks:
+      - bank-network
+
+    # Base de dados exclusiva para Transferências (Porto 5433)
+  db-transferencia:
+    image: postgres:17
+    container_name: db-transferencia
+    environment:
+      - POSTGRES_DB=transferencia_db
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+    ports:
+      - "5433:5432"
+    volumes:
+      - transferencia_data:/var/lib/postgresql/data
+    networks:
+      - bank-network
+
+  db-keycloak:
+    image: postgres:17
+    container_name: db-keycloak
+    environment:
+      - POSTGRES_DB=keycloak_db
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+    ports:
+      - "5434:5432"
+    volumes:
+      - keycloack_data:/var/lib/postgresql/data
+    networks:
+      - bank-network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.0
+    container_name: keycloak-estavel
+    command: start-dev --db=postgres --db-url=jdbc:postgresql://db-keycloak:5432/keycloak_db --db-username=admin --db-password=admin
+    depends_on:
+      - db-keycloak
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    ports:
+      - "8180:8080"
+    networks:
+      - bank-network
+
+  redpanda: # Kafka
+    image: docker.redpanda.com/redpandadata/redpanda:v24.1.2
+    container_name: redpanda-estavel
+    command:
+      - redpanda start
+      - --overprovisioned
+      - --smp 1
+      - --memory 1G
+      - --kafka-addr PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
+      - --advertise-kafka-addr PLAINTEXT://redpanda:29092,OUTSIDE://localhost:9092
+    ports:
+      - "9092:9092"
+    networks:
+      - bank-network
+
+  jenkins:
+    image: jenkins/jenkins:lts
+    container_name: jenkins
+    privileged: true
+    user: root
+    ports:
+      - "8081:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - bank-network
+
+  sonarqube:
+    image: sonarqube:lts-community
+    container_name: sonarqube
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+    networks:
+      - bank-network
+
+networks:
+  bank-network:
+    driver: bridge
+
+volumes:
+  jenkins_data:
+  sonarqube_data:
+  cadastro_data:
+  transferencia_data:
+  keycloack_data:
