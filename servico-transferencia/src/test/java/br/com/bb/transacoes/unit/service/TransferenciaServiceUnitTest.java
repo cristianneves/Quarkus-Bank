@@ -7,6 +7,7 @@ import br.com.bb.transacoes.service.TransferenciaService;
 import br.com.bb.transacoes.unit.base.BaseUnitTest;
 import br.com.bb.transacoes.base.TestDataFactory;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.security.TestSecurity; // 🚀 Importante
 import io.smallrye.reactive.messaging.memory.InMemoryConnector;
 import io.smallrye.reactive.messaging.memory.InMemorySink;
 import jakarta.enterprise.inject.Any;
@@ -37,6 +38,7 @@ public class TransferenciaServiceUnitTest extends BaseUnitTest {
     }
 
     @Test
+    @TestSecurity(user = USER_ID, roles = "user")
     @DisplayName("Deve realizar transferencia com sucesso logicamente")
     void deveTransferirComSucesso() {
         TransferenciaDTO dto = new TransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO, new BigDecimal("100.00"), UUID.randomUUID().toString());
@@ -54,6 +56,7 @@ public class TransferenciaServiceUnitTest extends BaseUnitTest {
     }
 
     @Test
+    @TestSecurity(user = "OUTRO-USUARIO", roles = "user") // 🛡️ Simula ID diferente do banco
     @DisplayName("Deve falhar por seguranca quando o dono da conta e diferente")
     void deveFalharAcessoNegado() {
         TransferenciaDTO dto = new TransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO, new BigDecimal("100.00"), UUID.randomUUID().toString());
