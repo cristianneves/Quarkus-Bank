@@ -6,10 +6,10 @@ import br.com.bb.transacoes.exception.BusinessException;
 import br.com.bb.transacoes.model.Conta;
 import br.com.bb.transacoes.model.Transferencia;
 import io.quarkus.logging.Log;
+import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
-import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
 
@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 public class TransferenciaService {
 
     @Inject
-    JsonWebToken jwt; // 🔑 A chave da segurança: Identidade de quem chama
+    SecurityIdentity identity; // 🛡️ Abstração de identidade nativa do Quarkus
 
     @Inject
     @Channel("transferencias-concluidas")
@@ -28,15 +28,10 @@ public class TransferenciaService {
 
     @Transactional
     public void realizarTransferencia(TransferenciaDTO dto) {
-        // Verificação de Idempotência
+        // Idempotência
         Transferencia jaProcessada = Transferencia.findByIdempotencyKey(dto.idempotencyKey());
-        if (jaProcessada != null) {
-            // Se já existe, apenas ignoramos ou retornamos o recibo.
-            // Em bancos, retornar Sucesso (201/200) é a prática para evitar erros no App.
-            return;
-        }
+        if (jaProcessada != null) return;
 
-        // 1. Busca as contas
         Conta origem = Conta.findByNumeroWithLock(dto.numeroOrigem());
         Conta destino = Conta.findByNumeroWithLock(dto.numeroDestino());
 
@@ -44,23 +39,22 @@ public class TransferenciaService {
             throw new BusinessException("Conta de origem ou destino não encontrada.");
         }
 
-        // 2. VALIDAÇÃO DE SEGURANÇA
-        // Verificamos se o 'sub' do Token é igual ao 'keycloakId' da conta de origem
-        String callerId = jwt.getSubject();
+        // 🛡️ VALIDAÇÃO DE SEGURANÇA
+        // O getName() do Principal pegará o valor definido no @TestSecurity(user = "...")
+        String callerId = identity.getPrincipal().getName();
+
         if (!origem.keycloakId.equals(callerId)) {
+            Log.errorf("Bloqueio de Segurança: Conta de %s acessada por %s", origem.keycloakId, callerId);
             throw new BusinessException("Você não tem permissão para transferir desta conta.");
         }
 
-        // 3. Validação de Saldo
         if (origem.saldo.compareTo(dto.valor()) < 0) {
             throw new BusinessException("Saldo insuficiente.");
         }
 
-        // 4. Execução Financeira (Débito e Crédito)
         origem.saldo = origem.saldo.subtract(dto.valor());
         destino.saldo = destino.saldo.add(dto.valor());
 
-        // 5. REGISTRO DE AUDITORIA (Persistindo o histórico)
         Transferencia historico = new Transferencia();
         historico.numeroOrigem = dto.numeroOrigem();
         historico.numeroDestino = dto.numeroDestino();
@@ -68,30 +62,18 @@ public class TransferenciaService {
         historico.dataHora = LocalDateTime.now();
         historico.status = "CONCLUIDA";
         historico.idempotencyKey = dto.idempotencyKey();
-        historico.persist(); // Salva no banco de transações
+        historico.persist();
 
-        // 6. Notificação para o Ecossistema (Kafka)
         emissorTransferencia.send(dto);
     }
 
     @Transactional
     public void depositar(DepositoDTO dto) {
-        Log.infof("Realizando depósito de R$ %s na conta %s", dto.valor(), dto.numeroConta());
-
         Conta conta = Conta.findByNumeroWithLock(dto.numeroConta());
-
-        if (conta == null) {
-            throw new BusinessException("Conta não encontrada para depósito.");
-        }
-
-        if (dto.valor().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BusinessException("O valor do depósito deve ser positivo.");
-        }
+        if (conta == null) throw new BusinessException("Conta não encontrada.");
+        if (dto.valor().compareTo(BigDecimal.ZERO) <= 0) throw new BusinessException("Valor deve ser positivo.");
 
         conta.saldo = conta.saldo.add(dto.valor());
         conta.persist();
-
-        Log.infof("Depósito realizado com sucesso. Novo saldo da conta %s: R$ %s",
-                conta.numero, conta.saldo);
     }
 }
