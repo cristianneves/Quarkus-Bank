@@ -1,6 +1,5 @@
 package br.com.bb.transacoes.service;
 
-import br.com.bb.transacoes.dto.DepositoDTO;
 import br.com.bb.transacoes.dto.TransferenciaDTO;
 import br.com.bb.transacoes.exception.BusinessException;
 import br.com.bb.transacoes.model.Conta;
@@ -10,17 +9,20 @@ import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
+import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @ApplicationScoped
 public class TransferenciaService {
 
     @Inject
-    SecurityIdentity identity; // 🛡️ Abstração de identidade nativa do Quarkus
+    SecurityIdentity identity;
+
+    @Inject
+    JsonWebToken jwt; // Acesso direto às claims do Token
 
     @Inject
     @Channel("transferencias-concluidas")
@@ -39,11 +41,12 @@ public class TransferenciaService {
             throw new BusinessException("Conta de origem ou destino não encontrada.");
         }
 
-        // 🛡️ VALIDAÇÃO DE SEGURANÇA
-        // O getName() do Principal pegará o valor definido no @TestSecurity(user = "...")
-        String callerId = identity.getPrincipal().getName();
+        // Em vez de getName(), usamos getSubject() que SEMPRE retorna o 'sub' (UUID)
+        String callerId = jwt.getSubject();
 
-        if (!origem.keycloakId.equals(callerId)) {
+        Log.infof("Tentativa de Transferência -> Banco: %s | Token: %s", origem.keycloakId, callerId);
+
+        if (callerId == null || !origem.keycloakId.equals(callerId)) {
             Log.errorf("Bloqueio de Segurança: Conta de %s acessada por %s", origem.keycloakId, callerId);
             throw new BusinessException("Você não tem permissão para transferir desta conta.");
         }
@@ -65,15 +68,5 @@ public class TransferenciaService {
         historico.persist();
 
         emissorTransferencia.send(dto);
-    }
-
-    @Transactional
-    public void depositar(DepositoDTO dto) {
-        Conta conta = Conta.findByNumeroWithLock(dto.numeroConta());
-        if (conta == null) throw new BusinessException("Conta não encontrada.");
-        if (dto.valor().compareTo(BigDecimal.ZERO) <= 0) throw new BusinessException("Valor deve ser positivo.");
-
-        conta.saldo = conta.saldo.add(dto.valor());
-        conta.persist();
     }
 }
