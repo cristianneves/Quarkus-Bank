@@ -1,14 +1,14 @@
 package br.com.bb.cadastro.service;
 
 import br.com.bb.cadastro.dto.PessoaDTO;
+import br.com.bb.cadastro.model.OutboxEvent;
 import br.com.bb.cadastro.model.Pessoa;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
-import org.eclipse.microprofile.reactive.messaging.Channel;
-import org.eclipse.microprofile.reactive.messaging.Emitter;
 import org.keycloak.admin.client.CreatedResponseUtil;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.CredentialRepresentation;
@@ -21,23 +21,55 @@ import java.util.Collections;
 public class PessoaService {
 
     @Inject
-    Keycloak keycloak; // O cliente que instalamos
+    Keycloak keycloak;
 
     @Inject
-    @Channel("pessoa-criada") // Nome do canal que configuraremos no properties
-    Emitter<Pessoa> pessoaEmitter;
+    ObjectMapper objectMapper; // Para serializar o evento
 
     @Transactional
     public Pessoa registrarNovoUsuario(PessoaDTO dto) {
-        if (Pessoa.find("cpf", dto.cpf).firstResult() != null) {
-            throw new WebApplicationException("CPF já cadastrado no banco!", 400);
+        validarCpfUnico(dto.cpf);
+
+        // 1. Registro no Keycloak (Fluxo externo)
+        String keycloakId = criarUsuarioNoKeycloak(dto);
+        atribuirRoleUsuario(keycloakId);
+
+        // 2. Persistência de Negócio
+        Pessoa pessoa = new Pessoa();
+        pessoa.nome = dto.nome;
+        pessoa.cpf = dto.cpf;
+        pessoa.email = dto.email;
+        pessoa.keycloakId = keycloakId;
+        pessoa.persist();
+
+        // 3. REGISTRO NO OUTBOX (A mágica da consistência)
+        try {
+            String jsonPayload = objectMapper.writeValueAsString(pessoa);
+            OutboxEvent event = new OutboxEvent(
+                    "PESSOA",
+                    pessoa.keycloakId,
+                    "PESSOA_CRIADA",
+                    jsonPayload
+            );
+            event.persist(); // Salvo na mesma transação da Pessoa!
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao gerar evento de outbox", e);
         }
-        // 1. Criar o usuário no Keycloak
+
+        return pessoa;
+    }
+
+    private void validarCpfUnico(String cpf) {
+        if (Pessoa.find("cpf", cpf).firstResult() != null) {
+            throw new WebApplicationException("CPF já cadastrado!", 400);
+        }
+    }
+
+    private String criarUsuarioNoKeycloak(PessoaDTO dto) {
         UserRepresentation user = new UserRepresentation();
         user.setUsername(dto.email);
         user.setEmail(dto.email);
         user.setFirstName(dto.nome);
-        user.setEmailVerified(true);
         user.setEnabled(true);
 
         CredentialRepresentation cred = new CredentialRepresentation();
@@ -47,27 +79,14 @@ public class PessoaService {
         user.setCredentials(Collections.singletonList(cred));
 
         Response response = keycloak.realm("bank-realm").users().create(user);
-
         if (response.getStatus() != 201) {
-            throw new RuntimeException("Erro ao criar no Keycloak: " + response.getStatus());
+            throw new RuntimeException("Falha na integração com Keycloak");
         }
+        return CreatedResponseUtil.getCreatedId(response);
+    }
 
-        String keycloakId = CreatedResponseUtil.getCreatedId(response);
-
-        // 🚀 2. ATRIBUIR ROLE 'user' (O detalhe que faltava)
-        RoleRepresentation userRole = keycloak.realm("bank-realm").roles().get("user").toRepresentation();
-        keycloak.realm("bank-realm").users().get(keycloakId).roles().realmLevel().add(Collections.singletonList(userRole));
-
-        // 3. Salvar no Postgres 17
-        Pessoa pessoa = new Pessoa();
-        pessoa.nome = dto.nome;
-        pessoa.cpf = dto.cpf;
-        pessoa.email = dto.email;
-        pessoa.keycloakId = keycloakId;
-        pessoa.persist();
-
-        pessoaEmitter.send(pessoa);
-
-        return pessoa;
+    private void atribuirRoleUsuario(String userId) {
+        RoleRepresentation role = keycloak.realm("bank-realm").roles().get("user").toRepresentation();
+        keycloak.realm("bank-realm").users().get(userId).roles().realmLevel().add(Collections.singletonList(role));
     }
 }
