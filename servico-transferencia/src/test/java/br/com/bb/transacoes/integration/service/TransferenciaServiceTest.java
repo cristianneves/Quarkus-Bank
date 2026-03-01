@@ -10,6 +10,8 @@ import br.com.bb.transacoes.service.TransferenciaService;
 import io.quarkus.panache.mock.PanacheMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.security.TestSecurity; // 🚀 Importante
+import io.quarkus.test.security.jwt.Claim;
+import io.quarkus.test.security.jwt.JwtSecurity;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,6 +36,7 @@ public class TransferenciaServiceTest extends BaseMessagingTest {
 
     @Test
     @TestSecurity(user = USER_ID, roles = "user") // 🛡️ Define a identidade para o Service
+    @JwtSecurity(claims = { @Claim(key = "sub", value = USER_ID) }) // 🚀 ADICIONE ISSO AQUI TAMBÉM!
     @DisplayName("Deve transferir com sucesso e notificar Kafka")
     public void deveTransferirComSucesso() {
         Conta origem = TestDataFactory.contaPadraoOrigem();
@@ -50,6 +53,7 @@ public class TransferenciaServiceTest extends BaseMessagingTest {
 
     @Test
     @TestSecurity(user = "HACKER-ID", roles = "user") // 🛡️ Simula um invasor
+    @JwtSecurity(claims = { @Claim(key = "sub", value = USER_ID) }) // 🚀 E AQUI TAMBÉM!
     @DisplayName("Deve falhar por Acesso Negado")
     public void deveFalharAcessoNegado() {
         mockContas(TestDataFactory.contaPadraoOrigem(), TestDataFactory.contaPadraoDestino());

@@ -22,9 +22,6 @@ public class TransferenciaService {
     SecurityIdentity identity;
 
     @Inject
-    JsonWebToken jwt; // Acesso direto às claims do Token
-
-    @Inject
     @Channel("transferencias-concluidas")
     Emitter<TransferenciaDTO> emissorTransferencia;
 
@@ -41,8 +38,7 @@ public class TransferenciaService {
             throw new BusinessException("Conta de origem ou destino não encontrada.");
         }
 
-        // Em vez de getName(), usamos getSubject() que SEMPRE retorna o 'sub' (UUID)
-        String callerId = jwt.getSubject();
+        String callerId = identity.getPrincipal().getName();
 
         Log.infof("Tentativa de Transferência -> Banco: %s | Token: %s", origem.keycloakId, callerId);
 

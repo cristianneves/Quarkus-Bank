@@ -8,6 +8,8 @@ import br.com.bb.transacoes.model.Transferencia;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.security.TestSecurity;
+import io.quarkus.test.security.jwt.Claim;
+import io.quarkus.test.security.jwt.JwtSecurity;
 import io.restassured.http.ContentType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +37,9 @@ public class TransferenciaResourceTest extends BaseIntegrationTest {
 
     @Test
     @TestSecurity(user = USER_ID, roles = "user")
+    @JwtSecurity(claims = {
+            @Claim(key = "sub", value = USER_ID) // 🔑 Aqui o framework preenche o jwt.getSubject()
+    })
     @DisplayName("Deve realizar uma transferência com sucesso")
     public void deveRealizarTransferenciaComSucesso() {
         TransferenciaDTO dto = criarDTO(CONTA_ORIGEM, CONTA_DESTINO, new BigDecimal("100.00"));

@@ -12,14 +12,10 @@ import static org.mockito.Mockito.when;
 
 public abstract class BaseUnitTest implements TestConstants {
 
-    @InjectMock
-    protected JsonWebToken jwt;
 
     @BeforeEach
     public void setupBase() {
         PanacheMock.mock(Conta.class);
         PanacheMock.mock(Transferencia.class);
-
-        when(jwt.getSubject()).thenReturn(USER_ID);
     }
 }

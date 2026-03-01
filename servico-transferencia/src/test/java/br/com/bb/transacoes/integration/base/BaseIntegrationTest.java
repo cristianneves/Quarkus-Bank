@@ -15,8 +15,6 @@ import static org.mockito.Mockito.when;
 
 public abstract class BaseIntegrationTest implements TestConstants {
 
-    @InjectMock
-    protected JsonWebToken jwt;
 
     @TestHTTPResource
     URL url;
@@ -31,8 +29,6 @@ public abstract class BaseIntegrationTest implements TestConstants {
                 .setAccept(ContentType.JSON)
                 .build();
 
-        // Mock de identidade padrão
-        when(jwt.getSubject()).thenReturn(USER_ID);
     }
 
     protected String getCpfFake() {

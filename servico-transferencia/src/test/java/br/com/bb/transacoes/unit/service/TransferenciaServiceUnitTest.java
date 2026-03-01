@@ -8,6 +8,8 @@ import br.com.bb.transacoes.unit.base.BaseUnitTest;
 import br.com.bb.transacoes.base.TestDataFactory;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.security.TestSecurity; // 🚀 Importante
+import io.quarkus.test.security.jwt.Claim;
+import io.quarkus.test.security.jwt.JwtSecurity;
 import io.smallrye.reactive.messaging.memory.InMemoryConnector;
 import io.smallrye.reactive.messaging.memory.InMemorySink;
 import jakarta.enterprise.inject.Any;
@@ -39,6 +41,7 @@ public class TransferenciaServiceUnitTest extends BaseUnitTest {
 
     @Test
     @TestSecurity(user = USER_ID, roles = "user")
+    @JwtSecurity(claims = { @Claim(key = "sub", value = USER_ID) }) // 🔑 Garante o Principal Name
     @DisplayName("Deve realizar transferencia com sucesso logicamente")
     void deveTransferirComSucesso() {
         TransferenciaDTO dto = new TransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO, new BigDecimal("100.00"), UUID.randomUUID().toString());
