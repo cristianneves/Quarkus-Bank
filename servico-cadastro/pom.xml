@@ -19,6 +19,9 @@
         <jacoco.version>0.8.12</jacoco.version>
         <sonar.projectKey>servico-cadastro</sonar.projectKey>
         <sonar.projectName>servico-cadastro</sonar.projectName>
+        <sonar.java.binaries>${project.build.outputDirectory}</sonar.java.binaries>
+        <sonar.sources>src/main/java</sonar.sources>
+        <sonar.tests>src/test/java</sonar.tests>
         <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/jacoco-report/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
     </properties>
 
