@@ -85,6 +85,38 @@ public class PessoaService {
         return CreatedResponseUtil.getCreatedId(response);
     }
 
+    @Transactional
+    public Pessoa cadastrarUsuarioLogado(Pessoa pessoa, String keycloakId) {
+        // 1. Verificamos se ele já não existe para evitar duplicidade
+        if (Pessoa.find("keycloakId", keycloakId).firstResult() != null) {
+            throw new WebApplicationException("Usuário já cadastrado.", 409);
+        }
+
+        pessoa.keycloakId = keycloakId;
+        pessoa.persist();
+
+        // 2. AGORA GARANTIMOS O OUTBOX AQUI TAMBÉM!
+        salvarNoOutbox(pessoa);
+
+        return pessoa;
+    }
+
+    // Extraímos a lógica do Outbox para um método privado para evitar repetição (DRY)
+    private void salvarNoOutbox(Pessoa pessoa) {
+        try {
+            String jsonPayload = objectMapper.writeValueAsString(pessoa);
+            OutboxEvent event = new OutboxEvent(
+                    "PESSOA",
+                    pessoa.keycloakId,
+                    "PESSOA_CRIADA",
+                    jsonPayload
+            );
+            event.persist();
+        } catch (Exception e) {
+            throw new RuntimeException("Erro ao gerar evento de outbox", e);
+        }
+    }
+
     private void atribuirRoleUsuario(String userId) {
         RoleRepresentation role = keycloak.realm("bank-realm").roles().get("user").toRepresentation();
         keycloak.realm("bank-realm").users().get(userId).roles().realmLevel().add(Collections.singletonList(role));

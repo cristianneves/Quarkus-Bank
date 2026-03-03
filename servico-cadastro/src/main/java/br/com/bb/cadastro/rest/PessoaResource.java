@@ -26,16 +26,14 @@ public class PessoaResource {
     PessoaService pessoaService;
 
     @POST
-    @Transactional
     @RolesAllowed("user")
     public Response cadastrar(Pessoa pessoa) {
-        // Extraímos o ID único do Keycloak (campo 'sub')
         String sub = jwt.getSubject();
 
-        pessoa.keycloakId = sub;
-        pessoa.persist();
+        // 🚀 O Service agora garante a Pessoa + Outbox em uma só transação
+        Pessoa cadastrada = pessoaService.cadastrarUsuarioLogado(pessoa, sub);
 
-        return Response.status(Response.Status.CREATED).entity(pessoa).build();
+        return Response.status(Response.Status.CREATED).entity(cadastrada).build();
     }
 
     @POST

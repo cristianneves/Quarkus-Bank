@@ -1,0 +1,45 @@
+
+TODO LIST
+
+
+🔴 Prioridade 1: Integridade e Segurança Crítica (Obrigatório)
+
+-Implementação do Transactional Outbox Pattern: Esta é a correção do problema de "Dual Write". Atualmente, você envia mensagens para o Kafka
+ dentro do @Transactional. Se o banco falhar após o envio, o sistema fica inconsistente. Devemos gravar o evento em uma tabela outbox na mesma transação do negócio e ter um Worker para despachar ao Kafka.
+
+-Gestão de Segredos e Credenciais: Suas senhas de banco e do admin-cli do Keycloak estão expostas no application.properties. Em um banco, isso
+ é uma falha gravíssima de conformidade. Devemos migrar para Variáveis de Ambiente ou um Secret Manager (como HashiCorp Vault).
+
+-Sincronização de Cadastro (Keycloak vs. Banco): No PessoaService, se o Keycloak criar o usuário mas o seu banco local falhar, você terá um
+usuário órfão. Precisamos de um fluxo de compensação ou de uma saga para garantir que o usuário só exista se estiver em ambos os lugares.
+
+-Sanitização de Logs e DTOs: O PessoaDTO trafega a senha em texto claro. Precisamos garantir que campos sensíveis nunca sejam impressos em logs
+ de erro ou auditoria (masking) para evitar vazamento de dados de clientes.
+
+🟡 Prioridade 2: Resiliência e Evolução (Padrão Corporativo)
+
+-Versionamento de Banco com Flyway ou Liquibase: O uso de database.generation=update é proibido em produção bancária. Precisamos de scripts SQL
+ versionados para que o DBA possa auditar cada alteração de esquema antes que ela chegue ao ambiente real.
+
+-Fault Tolerance (Resiliência de Chamadas): O endpoint de Perfil no serviço de Cadastro chama o serviço de Transferência de forma síncrona. Se a
+ Transferência cair, o Cadastro "congela". Precisamos aplicar @CircuitBreaker e @Fallback para o usuário ver seus dados básicos mesmo sem o saldo.
+
+-Propagação Automática de Token (OIDC Filter): Atualmente, você passa o header "Bearer" manualmente no PerfilResource. O padrão Quarkus é usar o
+ quarkus-rest-client-oidc-filter para que o framework trate a segurança de forma transparente e segura.
+
+-Abstração de URLs de Serviços: Você está usando localhost nas URLs do Rest Client. No mundo real (Kubernetes/Cloud), serviços mudam de endereço.
+Devemos usar nomes de serviços e abstrair as URLs para facilitar a promoção entre ambientes (Dev, Homolog, Prod).
+
+🔵 Prioridade 3: Design, Manutenibilidade e Observabilidade
+
+-Domain-Driven Design (Modelo de Domínio Rico): Suas entidades como Conta e Pessoa são "sacos de dados" (anêmicas). Em um banco sênior, a lógica de
+ "posso debitar?" ou "validar regra de negócio" deve estar dentro da entidade, protegendo o estado do objeto.
+
+-Catálogo de Erros Padronizado: Em vez de retornar apenas mensagens de texto em português, devemos adotar um Catálogo de Erros (ex: BB-ERR-001).
+ Isso facilita o monitoramento e permite que o Front-end trate erros de forma internacionalizada.
+
+-Observabilidade Completa: Falta a implementação de métricas (Prometheus/Grafana) e rastreamento distribuído (Jaeger). Sem isso, você não consegue
+ rastrear uma transação que começa no Cadastro e termina na Transferência se algo falhar no meio.
+
+-Rigor no SonarQube: Você excluiu DTOs e Models da análise. No padrão sênior, não há atalhos. Tudo que carrega anotações (como validações de CPF e
+ Email) deve ser incluído na cobertura de testes para garantir que as regras de entrada nunca quebrem.
