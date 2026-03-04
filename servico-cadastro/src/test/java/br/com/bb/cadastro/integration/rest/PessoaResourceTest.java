@@ -1,5 +1,7 @@
 package br.com.bb.cadastro.integration.rest;
 
+import br.com.bb.cadastro.dto.PessoaDTO;
+import br.com.bb.cadastro.integration.base.BaseSecurityTest;
 import br.com.bb.cadastro.model.OutboxEvent;
 import br.com.bb.cadastro.model.Pessoa;
 import io.quarkus.test.InjectMock;
@@ -18,7 +20,7 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.mockito.Mockito.when;
 
 @QuarkusTest
-public class PessoaResourceTest {
+public class PessoaResourceTest extends BaseSecurityTest {
 
     @InjectMock
     JsonWebToken jwt;
@@ -59,5 +61,20 @@ public class PessoaResourceTest {
         // 🛡️ Validação extra de segurança bancária:
         // O registro realmente existe no banco agora?
         Assertions.assertEquals(1, Pessoa.count());
+    }
+
+    @Test
+    @DisplayName("REST: Deve registrar nova pessoa via DTO com sucesso")
+    void deveRegistrarPessoaViaDto() {
+        setupKeycloakMockSuccess();
+        PessoaDTO dto = criarPessoaDTO();
+
+        RestAssured.given()
+                .contentType(io.restassured.http.ContentType.JSON)
+                .body(dto)
+                .when().post("/api/pessoas/registrar") // Ajuste para a rota correta do seu DTO
+                .then()
+                .statusCode(201)
+                .body("nome", is(dto.nome));
     }
 }
