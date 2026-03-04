@@ -21,7 +21,7 @@
         <sonar.projectName>servico-cadastro</sonar.projectName>
         <sonar.sources>src/main/java</sonar.sources>
         <sonar.java.binaries>${project.build.directory}/classes</sonar.java.binaries>
-        <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/jacoco-report/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+        <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/jacoco-reports/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
         <sonar.sourceEncoding>UTF-8</sonar.sourceEncoding>
     </properties>
 
