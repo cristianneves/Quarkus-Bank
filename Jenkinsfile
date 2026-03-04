@@ -47,28 +47,28 @@ pipeline {
 
 		stage('Sonar: Cadastro') {
 			steps {
-				withSonarQubeEnv('SonarQubeServer') {
-					dir('servico-cadastro') {
+				dir('servico-cadastro') {
+					withSonarQubeEnv('SonarQubeServer') {
 						sh "chmod +x ./mvnw && ./mvnw sonar:sonar -Dsonar.projectKey=servico-cadastro"
 					}
-				}
-				timeout(time: 5, unit: 'MINUTES') {
-					// 🎯 O waitForQualityGate aqui vai ler APENAS o report do cadastro
-					waitForQualityGate abortPipeline: true
+					// 🎯 O waitForQualityGate aqui vai ler APENAS o report desta pasta
+					timeout(time: 5, unit: 'MINUTES') {
+						waitForQualityGate abortPipeline: true
+					}
 				}
 			}
 		}
 
 		stage('Sonar: Transferência') {
 			steps {
-				withSonarQubeEnv('SonarQubeServer') {
-					dir('servico-transferencia') {
+				dir('servico-transferencia') {
+					withSonarQubeEnv('SonarQubeServer') {
 						sh "chmod +x ./mvnw && ./mvnw sonar:sonar -Dsonar.projectKey=servico-transferencia"
 					}
-				}
-				timeout(time: 5, unit: 'MINUTES') {
-					// 🎯 O waitForQualityGate aqui será forçado a pegar o novo ID da transferência
-					waitForQualityGate abortPipeline: true
+					// 🎯 O isolamento do 'dir' e do estágio força o Jenkins a pegar o ID 'AZy2dzFkJnEsPQrVi_TT'
+					timeout(time: 5, unit: 'MINUTES') {
+						waitForQualityGate abortPipeline: true
+					}
 				}
 			}
 		}
