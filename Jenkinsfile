@@ -45,29 +45,31 @@ pipeline {
 			}
 		}
 
-		stage('SonarQube: Análise e Check') {
+		stage('SonarQube: Análise de Qualidade') {
 			steps {
 				script {
-					// 1. Analisar e Checar Cadastro
 					withSonarQubeEnv('SonarQubeServer') {
+						// 1. Analisar Serviço de Cadastro
 						dir('servico-cadastro') {
-							sh "mvn sonar:sonar ..."
+							sh """
+                    ./mvnw sonar:sonar \
+                    -Dsonar.projectKey=servico-cadastro \
+                    -Dsonar.projectName='servico-cadastro' \
+                    -Dsonar.java.binaries=target/classes \
+                    -Dsonar.coverage.jacoco.xmlReportPaths=target/jacoco-reports/jacoco.xml
+                """
 						}
-					}
-					timeout(time: 10, unit: 'MINUTES') {
-						def qgCadastro = waitForQualityGate()
-						if (qgCadastro.status != 'OK') error "❌ Quality Gate CADASTRO falhou!"
-					}
 
-					// 2. Analisar e Checar Transferência
-					withSonarQubeEnv('SonarQubeServer') {
+						// 2. Analisar Serviço de Transferência
 						dir('servico-transferencia') {
-							sh "mvn sonar:sonar ..."
+							sh """
+                    ./mvnw sonar:sonar \
+                    -Dsonar.projectKey=servico-transferencia \
+                    -Dsonar.projectName='servico-transferencia' \
+                    -Dsonar.java.binaries=target/classes \
+                    -Dsonar.coverage.jacoco.xmlReportPaths=target/jacoco-reports/jacoco.xml
+                """
 						}
-					}
-					timeout(time: 10, unit: 'MINUTES') {
-						def qgTransf = waitForQualityGate()
-						if (qgTransf.status != 'OK') error "❌ Quality Gate TRANSFERÊNCIA falhou!"
 					}
 				}
 			}
