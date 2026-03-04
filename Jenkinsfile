@@ -45,32 +45,28 @@ pipeline {
 			}
 		}
 
-		stage('SonarQube: Análise de Qualidade') {
+		stage('SonarQube: Análise e Bloqueio') {
 			steps {
 				script {
+					// 1. Analisa Cadastro
 					withSonarQubeEnv('SonarQubeServer') {
-						// 1. Analisar Serviço de Cadastro
 						dir('servico-cadastro') {
-							sh """
-                    chmod +x ./mvnw
-                    ./mvnw sonar:sonar \
-                    -Dsonar.projectKey=servico-cadastro \
-                    -Dsonar.projectName='servico-cadastro' \
-                    -Dsonar.java.binaries=target/classes \
-                    -Dsonar.coverage.jacoco.xmlReportPaths=target/jacoco-reports/jacoco.xml
-                """
+							sh "chmod +x ./mvnw && ./mvnw sonar:sonar -Dsonar.projectKey=servico-cadastro"
 						}
-
-						// 2. Analisar Serviço de Transferência
+					}
+					// 2. Analisa Transferência
+					withSonarQubeEnv('SonarQubeServer') {
 						dir('servico-transferencia') {
-							sh """
-                    chmod +x ./mvnw
-                    ./mvnw sonar:sonar \
-                    -Dsonar.projectKey=servico-transferencia \
-                    -Dsonar.projectName='servico-transferencia' \
-                    -Dsonar.java.binaries=target/classes \
-                    -Dsonar.coverage.jacoco.xmlReportPaths=target/jacoco-reports/jacoco.xml
-                """
+							sh "chmod +x ./mvnw && ./mvnw sonar:sonar -Dsonar.projectKey=servico-transferencia"
+						}
+					}
+
+					// 🚀 O pulo do gato: O Jenkins vai esperar o veredito de AMBOS
+					// Se qualquer um dos dois (ou os dois) falhar no Gate, o pipeline morre aqui.
+					timeout(time: 10, unit: 'MINUTES') {
+						def qg = waitForQualityGate()
+						if (qg.status != 'OK') {
+							error "❌ Quality Gate falhou! Verifique o SonarQube. Um dos serviços está abaixo de 80%."
 						}
 					}
 				}
