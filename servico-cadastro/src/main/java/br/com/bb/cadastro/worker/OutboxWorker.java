@@ -30,18 +30,23 @@ public class OutboxWorker {
 
         for (OutboxEvent event : events) {
             try {
-                // Envia o JSON puro para o Kafka
                 kafkaEmitter.send(event.payload)
                         .toCompletableFuture()
-                        .get(); // Espera a confirmação (Ack) do Kafka
+                        .get(); // 🚀 Pode lançar ExecutionException ou InterruptedException
 
                 event.processedAt = LocalDateTime.now();
                 event.persist();
                 Log.infof("Evento %d enviado ao Kafka com sucesso.", event.id);
 
+            } catch (InterruptedException e) {
+                // 🔴 Regra de Ouro: Restaura o status de interrupção da Thread
+                Thread.currentThread().interrupt();
+                Log.errorf("Thread interrompida durante o envio do evento %d", event.id);
+                break; // Interrompe o loop, já que a thread deve parar
+
             } catch (Exception e) {
+                // Trata outros erros (como falha de conexão no Kafka)
                 Log.errorf("Falha ao enviar evento %d: %s", event.id, e.getMessage());
-                // Não marcamos como processado, tentará novamente no próximo ciclo
             }
         }
     }
