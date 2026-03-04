@@ -45,47 +45,30 @@ pipeline {
 			}
 		}
 
-		stage('SonarQube: Análise e Bloqueio') {
+		stage('Sonar: Cadastro') {
 			steps {
-				script {
-					// 1. Analisa e BLOQUEIA o Cadastro
-					withSonarQubeEnv('SonarQubeServer') {
-						dir('servico-cadastro') {
-							sh "chmod +x ./mvnw && ./mvnw sonar:sonar -Dsonar.projectKey=servico-cadastro"
-						}
+				withSonarQubeEnv('SonarQubeServer') {
+					dir('servico-cadastro') {
+						sh "chmod +x ./mvnw && ./mvnw sonar:sonar -Dsonar.projectKey=servico-cadastro"
 					}
-					timeout(time: 5, unit: 'MINUTES') {
-						def qgCadastro = waitForQualityGate()
-						if (qgCadastro.status != 'OK') {
-							error "❌ Cadastro reprovado: ${qgCadastro.status} (Cover: 88.1%)"
-						}
-					}
-
-					// 2. Analisa e BLOQUEIA a Transferência
-					withSonarQubeEnv('SonarQubeServer') {
-						dir('servico-transferencia') {
-							sh "chmod +x ./mvnw && ./mvnw sonar:sonar -Dsonar.projectKey=servico-transferencia"
-						}
-					}
-					timeout(time: 5, unit: 'MINUTES') {
-						def qgTransf = waitForQualityGate()
-						if (qgTransf.status != 'OK') {
-							error "❌ Transferência reprovada: ${qgTransf.status} (Cover: 58.3%)"
-						}
-					}
+				}
+				timeout(time: 5, unit: 'MINUTES') {
+					// 🎯 O waitForQualityGate aqui vai ler APENAS o report do cadastro
+					waitForQualityGate abortPipeline: true
 				}
 			}
 		}
 
-		stage("Check Quality Gate") {
+		stage('Sonar: Transferência') {
 			steps {
-				script {
-					timeout(time: 1, unit: 'HOURS') {
-						def qg = waitForQualityGate()
-						if (qg.status != 'OK') {
-							error "❌ Quality Gate falhou: ${qg.status}. O build foi abortado para proteger a produção!"
-						}
+				withSonarQubeEnv('SonarQubeServer') {
+					dir('servico-transferencia') {
+						sh "chmod +x ./mvnw && ./mvnw sonar:sonar -Dsonar.projectKey=servico-transferencia"
 					}
+				}
+				timeout(time: 5, unit: 'MINUTES') {
+					// 🎯 O waitForQualityGate aqui será forçado a pegar o novo ID da transferência
+					waitForQualityGate abortPipeline: true
 				}
 			}
 		}
