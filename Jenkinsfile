@@ -48,25 +48,29 @@ pipeline {
 		stage('SonarQube: Análise e Bloqueio') {
 			steps {
 				script {
-					// 1. Analisa Cadastro
+					// 1. Analisa e BLOQUEIA o Cadastro
 					withSonarQubeEnv('SonarQubeServer') {
 						dir('servico-cadastro') {
 							sh "chmod +x ./mvnw && ./mvnw sonar:sonar -Dsonar.projectKey=servico-cadastro"
 						}
 					}
-					// 2. Analisa Transferência
+					timeout(time: 5, unit: 'MINUTES') {
+						def qgCadastro = waitForQualityGate()
+						if (qgCadastro.status != 'OK') {
+							error "❌ Cadastro reprovado: ${qgCadastro.status} (Cover: 88.1%)"
+						}
+					}
+
+					// 2. Analisa e BLOQUEIA a Transferência
 					withSonarQubeEnv('SonarQubeServer') {
 						dir('servico-transferencia') {
 							sh "chmod +x ./mvnw && ./mvnw sonar:sonar -Dsonar.projectKey=servico-transferencia"
 						}
 					}
-
-					// 🚀 O pulo do gato: O Jenkins vai esperar o veredito de AMBOS
-					// Se qualquer um dos dois (ou os dois) falhar no Gate, o pipeline morre aqui.
-					timeout(time: 10, unit: 'MINUTES') {
-						def qg = waitForQualityGate()
-						if (qg.status != 'OK') {
-							error "❌ Quality Gate falhou! Verifique o SonarQube. Um dos serviços está abaixo de 80%."
+					timeout(time: 5, unit: 'MINUTES') {
+						def qgTransf = waitForQualityGate()
+						if (qgTransf.status != 'OK') {
+							error "❌ Transferência reprovada: ${qgTransf.status} (Cover: 58.3%)"
 						}
 					}
 				}
