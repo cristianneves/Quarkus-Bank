@@ -52,6 +52,7 @@ pipeline {
 						// 1. Analisar Serviço de Cadastro
 						dir('servico-cadastro') {
 							sh """
+                    chmod +x ./mvnw
                     ./mvnw sonar:sonar \
                     -Dsonar.projectKey=servico-cadastro \
                     -Dsonar.projectName='servico-cadastro' \
@@ -63,6 +64,7 @@ pipeline {
 						// 2. Analisar Serviço de Transferência
 						dir('servico-transferencia') {
 							sh """
+                    chmod +x ./mvnw
                     ./mvnw sonar:sonar \
                     -Dsonar.projectKey=servico-transferencia \
                     -Dsonar.projectName='servico-transferencia' \
