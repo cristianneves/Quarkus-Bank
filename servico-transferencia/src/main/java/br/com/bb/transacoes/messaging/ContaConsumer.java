@@ -41,9 +41,8 @@ public class ContaConsumer {
             novaConta.numero = gerarNumeroContaUnico();
             novaConta.saldo = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
 
-            novaConta.persist();
-            Log.infof("✅ Conta %s criada com sucesso para o cliente %s", novaConta.numero, evento.nome());
-
+            novaConta.persistAndFlush(); // 🚀 Força o banco a validar as regras AGORA
+            Log.infof("✅ Conta %s criada com sucesso...", novaConta.numero);
         } catch (Exception e) {
             // 3. Tratamento de Concorrência Crítica
             // Se outra thread inseriu exatamente no mesmo milissegundo, a Constraint do Banco nos salva

@@ -9,15 +9,24 @@ import java.math.BigDecimal;
 
 @Entity
 public class Conta extends PanacheEntity {
+
+    @Column(nullable = false, unique = true)
     public String numero;
+
+    @Column(nullable = false)
     public String agencia;
+
+    @Column(nullable = false)
     public BigDecimal saldo;
 
     @Column(unique = true, nullable = false)
     public String keycloakId;
 
     public String nomeTitular;
+
+    @Column(nullable = false) // ✅ CPF não pode ser nulo!
     public String cpfTitular;
+
     public String emailTitular;
 
 

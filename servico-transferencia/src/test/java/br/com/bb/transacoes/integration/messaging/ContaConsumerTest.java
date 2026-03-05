@@ -11,6 +11,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
+
 @QuarkusTest
 public class ContaConsumerTest extends BaseMessagingTest {
 
@@ -47,6 +49,23 @@ public class ContaConsumerTest extends BaseMessagingTest {
 
         aguardarProcessamento(() -> {
             Assertions.assertEquals(1, Conta.find("keycloakId", id).count());
+        });
+    }
+
+    @Test
+    @DisplayName("Kafka: Deve logar erro ao falhar na persistência (Catch block)")
+    public void deveTratarErroNoConsumer() {
+        // 🎯 Enviamos um KeycloakId nulo.
+        // Como marcamos nullable = false no model, o persist() VAI explodir.
+        var eventoComErro = TestDataFactory.novoEventoPessoa(null, "12345678901");
+
+        enviarMensagem(CANAL_ENTRADA, eventoComErro);
+
+        aguardarProcessamento(() -> {
+            // Agora, como o persist() falhou, a busca não deve retornar nada
+            // Buscamos pelo CPF para garantir que nada com esse documento foi criado
+            Conta conta = Conta.find("cpfTitular", "12345678901").firstResult();
+            assertNull(conta, "A conta não deveria existir porque o persist falhou");
         });
     }
 }

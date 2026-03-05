@@ -28,8 +28,10 @@ public class TransferenciaResourceTest extends BaseIntegrationTest {
     @BeforeEach
     public void setup() {
         QuarkusTransaction.requiringNew().run(() -> {
-            Transferencia.deleteAll(); // 🧹 Limpa idempotência para não dar erro se rodar o teste de novo
+            Transferencia.deleteAll();
             Conta.deleteAll();
+            Conta.getEntityManager().flush();
+
             TestDataFactory.contaPadraoOrigem().persist();
             TestDataFactory.contaPadraoDestino().persist();
         });
@@ -38,7 +40,7 @@ public class TransferenciaResourceTest extends BaseIntegrationTest {
     @Test
     @TestSecurity(user = USER_ID, roles = "user")
     @JwtSecurity(claims = {
-            @Claim(key = "sub", value = USER_ID) // 🔑 Aqui o framework preenche o jwt.getSubject()
+            @Claim(key = "sub", value = USER_ID)
     })
     @DisplayName("Deve realizar uma transferência com sucesso")
     public void deveRealizarTransferenciaComSucesso() {
