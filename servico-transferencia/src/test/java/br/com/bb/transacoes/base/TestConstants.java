@@ -7,4 +7,5 @@ public interface TestConstants {
     String CONTA_ORIGEM = "123456";
     String CONTA_DESTINO = "543210";
     BigDecimal SALDO_PADRAO = new BigDecimal("1000.00");
+    String CPF_VALIDO = "75625688044";
 }

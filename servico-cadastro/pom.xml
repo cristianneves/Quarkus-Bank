@@ -16,6 +16,13 @@
         <quarkus.platform.version>3.31.2</quarkus.platform.version>
         <skipITs>true</skipITs>
         <surefire-plugin.version>3.5.4</surefire-plugin.version>
+        <jacoco.version>0.8.12</jacoco.version>
+        <sonar.projectKey>servico-cadastro</sonar.projectKey>
+        <sonar.projectName>servico-cadastro</sonar.projectName>
+        <sonar.sources>src/main/java</sonar.sources>
+        <sonar.java.binaries>${project.build.directory}/classes</sonar.java.binaries>
+        <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/jacoco-reports/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+        <sonar.sourceEncoding>UTF-8</sonar.sourceEncoding>
     </properties>
 
     <dependencyManagement>
@@ -73,6 +80,14 @@
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-scheduler</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
             <artifactId>quarkus-junit</artifactId>
             <scope>test</scope>
         </dependency>
@@ -109,6 +124,17 @@
             <artifactId>quarkus-test-security</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <version>4.2.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jacoco</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -129,13 +155,6 @@
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${surefire-plugin.version}</version>
-                <configuration>
-                    <argLine>@{argLine}</argLine>
-                    <systemPropertyVariables>
-                        <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
-                        <maven.home>${maven.home}</maven.home>
-                    </systemPropertyVariables>
-                </configuration>
             </plugin>
             <plugin>
                 <artifactId>maven-failsafe-plugin</artifactId>

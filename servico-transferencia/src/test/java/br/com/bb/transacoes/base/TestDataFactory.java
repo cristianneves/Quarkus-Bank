@@ -16,9 +16,29 @@ public class TestDataFactory implements TestConstants {
         c.saldo = saldo;
         return c;
     }
-    public static Conta contaPadraoOrigem() { return novaConta(CONTA_ORIGEM, USER_ID, SALDO_PADRAO); }
-    public static Conta contaPadraoDestino() { return novaConta(CONTA_DESTINO, "destino-id", new BigDecimal("500.00")); }
+    public static Conta contaPadraoOrigem() {
+        Conta c = new Conta();
+        c.numero = "123456";
+        c.keycloakId = USER_ID;
+        c.agencia = "0001";
+        c.saldo = new BigDecimal("1000.00");
+        c.cpfTitular = "381.337.050-02";
+        c.nomeTitular = "Cliente Origem";
+        c.emailTitular = "origem@bb.com.br";
+        return c;
+    }
 
+    public static Conta contaPadraoDestino() {
+        Conta c = new Conta();
+        c.numero = "543210";
+        c.keycloakId = "user-destino-id";
+        c.agencia = "0001";
+        c.saldo = new BigDecimal("500.00");
+        c.cpfTitular = "381.337.050-02";
+        c.nomeTitular = "Cliente Destino";
+        c.emailTitular = "destino@bb.com.br";
+        return c;
+    }
     public static TransferenciaDTO novaTransferenciaDTO(String origem, String destino, BigDecimal valor) {
         return new TransferenciaDTO(
                 origem,

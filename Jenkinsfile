@@ -45,40 +45,29 @@ pipeline {
 			}
 		}
 
-		stage('SonarQube: Análise de Qualidade') {
+		stage('Sonar: Cadastro') {
 			steps {
-				script {
+				dir('servico-cadastro') {
 					withSonarQubeEnv('SonarQubeServer') {
-						// 1. Analisar Serviço de Cadastro
-						dir('servico-cadastro') {
-							sh "mvn sonar:sonar \
-                        -Dsonar.projectKey=bb-cadastro \
-                        -Dsonar.projectName='Quarkus Bank - Cadastro' \
-                        -Dsonar.java.binaries=target/classes \
-                        -Dsonar.coverage.jacoco.xmlReportPaths=target/jacoco-reports/jacoco.xml"
-						}
-
-						// 2. Analisar Serviço de Transferência
-						dir('servico-transferencia') {
-							sh "mvn sonar:sonar \
-                        -Dsonar.projectKey=bb-transferencias \
-                        -Dsonar.projectName='Quarkus Bank - Transferências' \
-                        -Dsonar.java.binaries=target/classes \
-                        -Dsonar.coverage.jacoco.xmlReportPaths=target/jacoco-reports/jacoco.xml"
-						}
+						sh "chmod +x ./mvnw && ./mvnw sonar:sonar -Dsonar.projectKey=servico-cadastro"
+					}
+					// 🎯 O waitForQualityGate aqui vai ler APENAS o report desta pasta
+					timeout(time: 5, unit: 'MINUTES') {
+						waitForQualityGate abortPipeline: true
 					}
 				}
 			}
 		}
 
-		stage("Check Quality Gate") {
+		stage('Sonar: Transferência') {
 			steps {
-				script {
-					timeout(time: 1, unit: 'HOURS') {
-						def qg = waitForQualityGate()
-						if (qg.status != 'OK') {
-							error "❌ Quality Gate falhou: ${qg.status}. O build foi abortado para proteger a produção!"
-						}
+				dir('servico-transferencia') {
+					withSonarQubeEnv('SonarQubeServer') {
+						sh "chmod +x ./mvnw && ./mvnw sonar:sonar -Dsonar.projectKey=servico-transferencia"
+					}
+					// 🎯 O isolamento do 'dir' e do estágio força o Jenkins a pegar o ID 'AZy2dzFkJnEsPQrVi_TT'
+					timeout(time: 5, unit: 'MINUTES') {
+						waitForQualityGate abortPipeline: true
 					}
 				}
 			}
