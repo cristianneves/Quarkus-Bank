@@ -2,3 +2,4 @@
 .jacoco/
 jacoco.exec
 jacoco-report/
+.env
