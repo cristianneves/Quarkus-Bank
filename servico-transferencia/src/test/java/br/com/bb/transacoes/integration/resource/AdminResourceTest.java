@@ -82,4 +82,15 @@ public class AdminResourceTest extends BaseIntegrationTest {
                 .when().post("/api/admin/deposito")
                 .then().statusCode(403);
     }
+
+    @Test
+    @TestSecurity(user = "admin", roles = "admin")
+    @DisplayName("Admin: Deve listar logs usando a data atual quando o parâmetro for nulo")
+    void deveListarLogsSemParametroData() {
+        given()
+                .when().get("/api/admin/auditoria")
+                .then()
+                .statusCode(200);
+        // Isso garante que o 'else' do ternário (LocalDate.now()) seja executado
+    }
 }
