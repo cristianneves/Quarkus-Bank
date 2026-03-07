@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
 import java.security.Principal;
@@ -57,7 +58,7 @@ public class TransferenciaServiceUnitTest extends BaseUnitTest {
         // 🛡️ Blindagem da Identidade (Evita o NPE que aciona o Fallback)
         Principal mockPrincipal = mock(Principal.class);
         when(identity.getPrincipal()).thenReturn(mockPrincipal);
-        when(mockPrincipal.getName()).thenReturn(USER_ID);
+        lenient().when(mockPrincipal.getName()).thenReturn(USER_ID);
 
         // 🛡️ Garante que a Idempotência retorne NULL por padrão (Caminho Feliz)
         when(Transferencia.findByIdempotencyKey(anyString())).thenReturn(null);
@@ -131,13 +132,11 @@ public class TransferenciaServiceUnitTest extends BaseUnitTest {
     @DisplayName("Fallback: Deve atualizar status para ERRO_ENVIO_KAFKA se o registro existir")
     void deveExecutarFallbackComSucesso() {
         TransferenciaDTO dto = TestDataFactory.novaTransferenciaDTO("123", "456", BigDecimal.TEN);
-        Transferencia t = new Transferencia(); // Simula objeto já no banco
+        Transferencia t = new Transferencia();
         t.idempotencyKey = dto.idempotencyKey();
 
-        // Mockando a busca por chave de idempotência
         when(Transferencia.findByIdempotencyKey(dto.idempotencyKey())).thenReturn(t);
 
-        // Chamada direta ao método de fallback para garantir cobertura
         service.fallbackTransferencia(dto);
 
         assertEquals("ERRO_ENVIO_KAFKA", t.status);
@@ -147,12 +146,10 @@ public class TransferenciaServiceUnitTest extends BaseUnitTest {
     @DisplayName("Unit: Deve ignorar transferência já processada (Idempotência)")
     void deveTestarIdempotencia() {
         TransferenciaDTO dto = TestDataFactory.novaTransferenciaDTO("1", "2", BigDecimal.ONE);
-        // Mockando para o retorno NÃO ser nulo
         when(Transferencia.findByIdempotencyKey(anyString())).thenReturn(new Transferencia());
 
         service.realizarTransferencia(dto);
 
-        // Se o código chegou aqui sem erro e não chamou os mocks de Conta, passou pelo if!
         PanacheMock.verify(Conta.class, never()).findByNumeroWithLock(anyString());
     }
 
@@ -164,10 +161,88 @@ public class TransferenciaServiceUnitTest extends BaseUnitTest {
         Conta origem = TestDataFactory.contaPadraoOrigem();
 
         when(Conta.findByNumeroWithLock(CONTA_ORIGEM)).thenReturn(origem);
-        // Simula falha ao obter o nome do principal
         when(identity.getPrincipal()).thenReturn(null);
 
         assertThrows(BusinessException.class, () -> service.realizarTransferencia(dto));
+    }
+
+    @Test
+    @DisplayName("Fallback: Deve criar registro de contingência quando não existir no banco")
+    void deveCriarRegistroContingenciaQuandoNaoExiste() {
+        TransferenciaDTO dto = TestDataFactory.novaTransferenciaDTO("111", "222", BigDecimal.TEN);
+
+        when(Transferencia.findByIdempotencyKey(dto.idempotencyKey())).thenReturn(null);
+
+        service.fallbackTransferencia(dto);
+
+        PanacheMock.verify(Transferencia.class, times(1))
+                .findByIdempotencyKey(dto.idempotencyKey());
+    }
+
+    @Test
+    @TestSecurity(user = USER_ID, roles = "user")
+    @JwtSecurity(claims = { @Claim(key = "sub", value = USER_ID) })
+    @DisplayName("Unit: Deve executar fluxo feliz completo")
+    void deveExecutarFluxoFelizCompleto() {
+        TransferenciaDTO dto = TestDataFactory.novaTransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO, BigDecimal.TEN);
+
+        Conta origem = TestDataFactory.contaPadraoOrigem();
+        Conta destino = TestDataFactory.contaPadraoDestino();
+
+        when(Conta.findByNumeroWithLock(CONTA_ORIGEM)).thenReturn(origem);
+        when(Conta.findByNumeroWithLock(CONTA_DESTINO)).thenReturn(destino);
+
+        service.realizarTransferencia(dto);
+
+        assertEquals(0, new BigDecimal("990.00").compareTo(origem.saldo));
+
+        validarMensagemNoKafka(1);
+    }
+
+    @Test
+    @TestSecurity(user = "OUTRO-USUARIO", roles = "user")
+    @DisplayName("Unit: Deve bloquear acesso e não gerar efeitos colaterais")
+    void deveBloquearAcessoENaoPersistir() {
+        TransferenciaDTO dto = TestDataFactory.novaTransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO, BigDecimal.TEN);
+
+        Conta origem = TestDataFactory.contaPadraoOrigem();
+        Conta destino = TestDataFactory.contaPadraoDestino();
+
+        when(Conta.findByNumeroWithLock(CONTA_ORIGEM)).thenReturn(origem);
+        when(Conta.findByNumeroWithLock(CONTA_DESTINO)).thenReturn(destino);
+
+        Principal mockPrincipal = mock(Principal.class);
+        when(identity.getPrincipal()).thenReturn(mockPrincipal);
+        when(mockPrincipal.getName()).thenReturn("OUTRO-USUARIO");
+
+        BusinessException ex =
+                assertThrows(BusinessException.class, () -> service.realizarTransferencia(dto));
+
+        assertEquals("Você não tem permissão para transferir desta conta.", ex.getMessage());
+
+        validarMensagemNoKafka(0);
+    }
+
+    @Test
+    @TestSecurity(user = USER_ID, roles = "user")
+    @JwtSecurity(claims = { @Claim(key = "sub", value = USER_ID) })
+    @DisplayName("Unit: Deve permitir transferência quando saldo é igual ao valor")
+    void devePermitirSaldoIgualAoValor() {
+        BigDecimal valor = new BigDecimal("1000.00");
+
+        TransferenciaDTO dto = TestDataFactory.novaTransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO, valor);
+
+        Conta origem = TestDataFactory.novaConta(CONTA_ORIGEM, USER_ID, valor);
+        Conta destino = TestDataFactory.contaPadraoDestino();
+
+        when(Conta.findByNumeroWithLock(CONTA_ORIGEM)).thenReturn(origem);
+        when(Conta.findByNumeroWithLock(CONTA_DESTINO)).thenReturn(destino);
+
+        service.realizarTransferencia(dto);
+
+        assertEquals(0, BigDecimal.ZERO.compareTo(origem.saldo));
+
+        validarMensagemNoKafka(1);
     }
 
 
