@@ -13,9 +13,9 @@ import java.util.List;
 @Table(name = "audit_log")
 public class Auditoria extends PanacheEntity {
 
-    public String usuario;    // Quem fez (Admin Name/Email)
-    public String acao;       // O que fez (Nome do método)
-    public String detalhes;   // Parâmetros (JSON ou String)
+    public String usuario;
+    public String acao;
+    public String detalhes;
     public LocalDateTime dataHora;
 
     public Auditoria() {}

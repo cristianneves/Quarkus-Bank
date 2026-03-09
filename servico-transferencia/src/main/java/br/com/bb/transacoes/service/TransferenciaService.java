@@ -96,8 +96,6 @@ public class TransferenciaService {
             transferencia.status = "ERRO_ENVIO_KAFKA";
             Log.warnf("📦 Registro %s atualizado para status ERRO_ENVIO_KAFKA para futuro reprocessamento.", dto.idempotencyKey());
         } else {
-            // 2. Se a falha foi tão grave que nem o banco salvou na transação original,
-            // criamos um registro de 'emergência' aqui.
             Log.warnf("⚠️ Registro não encontrado no banco. Criando entrada de emergência para %s", dto.idempotencyKey());
 
             Transferencia contingencia = new Transferencia();
@@ -109,8 +107,5 @@ public class TransferenciaService {
             contingencia.status = "FALHA_GRAVE_CONTINGENCIA";
             contingencia.persist();
         }
-
-        // 3. (Opcional) Aqui você poderia disparar um alerta para o time de SRE/Sustentação
-        // EnviarEmailAlertas("Falha no Kafka ao processar transferência " + dto.idempotencyKey());
     }
 }

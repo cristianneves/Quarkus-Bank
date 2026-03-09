@@ -24,7 +24,6 @@ public class TransferenciaResource {
     @RolesAllowed("user")
     public Response realizar(@Valid TransferenciaDTO dto) {
         service.realizarTransferencia(dto);
-        // Retornamos 201 Created porque agora geramos um registro de Transferencia no banco
         return Response.status(Response.Status.CREATED).build();
     }
 }

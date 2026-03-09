@@ -27,7 +27,6 @@ public class AdminService {
         }
 
         conta.saldo = conta.saldo.add(dto.valor());
-        // Não precisamos de persist() aqui pois o método é @Transactional
     }
 
     // Consulta de Auditoria
