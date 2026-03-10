@@ -3,19 +3,14 @@ package br.com.bb.transacoes.service;
 import br.com.bb.transacoes.dto.TransferenciaDTO;
 import br.com.bb.transacoes.exception.BusinessException;
 import br.com.bb.transacoes.model.Conta;
+import br.com.bb.transacoes.model.OutboxEvent;
 import br.com.bb.transacoes.model.Transferencia;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.logging.Log;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
-import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
-import org.eclipse.microprofile.faulttolerance.Fallback;
-import org.eclipse.microprofile.faulttolerance.Retry;
-import org.eclipse.microprofile.jwt.JsonWebToken;
-import org.eclipse.microprofile.reactive.messaging.Channel;
-import org.eclipse.microprofile.reactive.messaging.Emitter;
-
 import java.time.LocalDateTime;
 
 @ApplicationScoped
@@ -25,87 +20,73 @@ public class TransferenciaService {
     SecurityIdentity identity;
 
     @Inject
-    @Channel("transferencias-concluidas")
-    Emitter<TransferenciaDTO> emissorTransferencia;
+    ObjectMapper objectMapper;
 
     @Transactional
-    @Retry(
-            maxRetries = 3,
-            delay = 1000,
-            abortOn = BusinessException.class
-    )
-    @CircuitBreaker(
-            requestVolumeThreshold = 4,
-            failureRatio = 0.5,
-            delay = 5000,
-            skipOn = BusinessException.class
-    )
-    @Fallback(
-            fallbackMethod = "fallbackTransferencia",
-            skipOn = BusinessException.class
-    )
     public void realizarTransferencia(TransferenciaDTO dto) {
-        // Idempotência
-        Transferencia jaProcessada = Transferencia.findByIdempotencyKey(dto.idempotencyKey());
-        if (jaProcessada != null) return;
+        // 1. Idempotência: Se já processamos essa chave, ignoramos silenciosamente
+        if (Transferencia.findByIdempotencyKey(dto.idempotencyKey()) != null) {
+            Log.warnf("⚠️ Transferência duplicada detectada: %s. Ignorando.", dto.idempotencyKey());
+            return;
+        }
 
+        // 2. Lock Pessimista: Garante exclusividade sobre as contas durante a transação
         Conta origem = Conta.findByNumeroWithLock(dto.numeroOrigem());
         Conta destino = Conta.findByNumeroWithLock(dto.numeroDestino());
 
         if (origem == null || destino == null) {
-            throw new BusinessException("Conta de origem ou destino não encontrada.");
+            throw new BusinessException("Conta de origem ou destino não localizada.");
         }
 
-        String callerId = identity.getPrincipal().getName();
+        // 3. Segurança: Valida se o dono do token é o dono da conta de origem
+        validarPropriedadeConta(origem);
 
-        Log.infof("Tentativa de Transferência -> Banco: %s | Token: %s", origem.keycloakId, callerId);
+        // 4. Execução do Negócio (Modelo Rico)
+        origem.debitar(dto.valor());
+        destino.creditar(dto.valor());
 
-        if (callerId == null || !origem.keycloakId.equals(callerId)) {
-            Log.errorf("Bloqueio de Segurança: Conta de %s acessada por %s", origem.keycloakId, callerId);
-            throw new BusinessException("Você não tem permissão para transferir desta conta.");
-        }
-
-        if (origem.saldo.compareTo(dto.valor()) < 0) {
-            throw new BusinessException("Saldo insuficiente.");
-        }
-
-        origem.saldo = origem.saldo.subtract(dto.valor());
-        destino.saldo = destino.saldo.add(dto.valor());
-
-        Transferencia historico = new Transferencia();
-        historico.numeroOrigem = dto.numeroOrigem();
-        historico.numeroDestino = dto.numeroDestino();
-        historico.valor = dto.valor();
-        historico.dataHora = LocalDateTime.now();
-        historico.status = "CONCLUIDA";
-        historico.idempotencyKey = dto.idempotencyKey();
+        // 5. Persistência do Histórico
+        Transferencia historico = criarHistorico(dto);
         historico.persist();
 
-        emissorTransferencia.send(dto);
+        // 6. REGISTRO NO OUTBOX (A substituição do envio direto ao Kafka)
+        registrarEventoNoOutbox(dto);
+
+        Log.infof("✅ Transferência %s processada e evento registrado no Outbox.", dto.idempotencyKey());
     }
 
-    @Transactional(Transactional.TxType.REQUIRES_NEW) // 🆕 Abre uma nova transação exclusiva para o Fallback
-    public void fallbackTransferencia(TransferenciaDTO dto) {
-        Log.errorf("🚨 [CONTINGÊNCIA] Falha crítica ao processar transferência: %s", dto.idempotencyKey());
+    private void validarPropriedadeConta(Conta origem) {
+        String callerId = identity.getPrincipal().getName();
+        if (callerId == null || !origem.keycloakId.equals(callerId)) {
+            Log.errorf("🚨 Tentativa de fraude: Usuário %s tentou usar conta de %s", callerId, origem.keycloakId);
+            throw new BusinessException("Operação não autorizada para este usuário.");
+        }
+    }
 
-        // 1. Tenta localizar o registro que (provavelmente) foi persistido antes da falha do Kafka
-        Transferencia transferencia = Transferencia.findByIdempotencyKey(dto.idempotencyKey());
+    private Transferencia criarHistorico(TransferenciaDTO dto) {
+        Transferencia t = new Transferencia();
+        t.numeroOrigem = dto.numeroOrigem();
+        t.numeroDestino = dto.numeroDestino();
+        t.valor = dto.valor();
+        t.dataHora = LocalDateTime.now();
+        t.status = "CONCLUIDA";
+        t.idempotencyKey = dto.idempotencyKey();
+        return t;
+    }
 
-        if (transferencia != null) {
-            // Se o registro existe, apenas atualizamos para um status de atenção
-            transferencia.status = "ERRO_ENVIO_KAFKA";
-            Log.warnf("📦 Registro %s atualizado para status ERRO_ENVIO_KAFKA para futuro reprocessamento.", dto.idempotencyKey());
-        } else {
-            Log.warnf("⚠️ Registro não encontrado no banco. Criando entrada de emergência para %s", dto.idempotencyKey());
-
-            Transferencia contingencia = new Transferencia();
-            contingencia.numeroOrigem = dto.numeroOrigem();
-            contingencia.numeroDestino = dto.numeroDestino();
-            contingencia.valor = dto.valor();
-            contingencia.idempotencyKey = dto.idempotencyKey();
-            contingencia.dataHora = LocalDateTime.now();
-            contingencia.status = "FALHA_GRAVE_CONTINGENCIA";
-            contingencia.persist();
+    private void registrarEventoNoOutbox(TransferenciaDTO dto) {
+        try {
+            String payload = objectMapper.writeValueAsString(dto);
+            OutboxEvent event = new OutboxEvent(
+                    "TRANSFERENCIA",
+                    dto.idempotencyKey(),
+                    "TRANSFERENCIA_REALIZADA",
+                    payload
+            );
+            event.persist();
+        } catch (Exception e) {
+            Log.error("❌ Falha crítica ao gerar payload do Outbox", e);
+            throw new RuntimeException("Erro interno ao registrar transação.");
         }
     }
 }
