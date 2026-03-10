@@ -39,7 +39,6 @@ public class AdminAuditInterceptor {
             return result;
 
         } catch (Exception e) {
-            // 3. Grava o log de ERRO também em uma nova transação
             QuarkusTransaction.requiringNew().run(() -> {
                 new Auditoria(adminName, methodName, "FALHA: " + e.getMessage()).persist();
             });

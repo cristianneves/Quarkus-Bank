@@ -15,5 +15,5 @@ public record TransferenciaDTO(
         @Positive(message = "O valor da transferência deve ser maior que zero")
         BigDecimal valor,
         @NotBlank(message = "A chave de idempotência é obrigatória")
-        String idempotencyKey // 🔑 O "bilhete" único da transação
+        String idempotencyKey
 ) {}

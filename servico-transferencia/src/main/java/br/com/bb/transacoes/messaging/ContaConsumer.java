@@ -19,10 +19,9 @@ public class ContaConsumer {
     @Incoming("pessoa-registrada")
     @Transactional
     public void criarContaAoCadastrarPessoa(PessoaEventDTO evento) {
-        // 1. Log de Recebimento com Rastreabilidade
         Log.infof("📩 Evento recebido - Cliente: %s | ID: %s", evento.nome(), evento.keycloakId());
 
-        // 2. Idempotência via Chave Natural (keycloakId)
+        // Idempotência via Chave Natural (keycloakId)
         // Usamos o count direto para performance
         if (Conta.count("keycloakId", evento.keycloakId()) > 0) {
             Log.warnf("⚠️ [Idempotência] Ignorando evento duplicado. Conta já existe para o ID: %s", evento.keycloakId());
@@ -44,15 +43,13 @@ public class ContaConsumer {
             novaConta.persistAndFlush(); // 🚀 Força o banco a validar as regras AGORA
             Log.infof("✅ Conta %s criada com sucesso...", novaConta.numero);
         } catch (Exception e) {
-            // 3. Tratamento de Concorrência Crítica
-            // Se outra thread inseriu exatamente no mesmo milissegundo, a Constraint do Banco nos salva
+            // Tratamento de Concorrência Crítica
             Log.errorf("🚨 Erro ao criar conta para ID %s: %s", evento.keycloakId(), e.getMessage());
-            // Nota: Em um banco real, aqui poderíamos enviar para uma DLQ (Dead Letter Queue)
         }
     }
 
     private String gerarNumeroContaUnico() {
-        // Simulação de geração. No BB, isso viria de uma SEQUENCE do banco para evitar colisões.
+        // Simulação de geração
         return String.valueOf(RANDOM.nextInt(900000) + 100000);
     }
 }
