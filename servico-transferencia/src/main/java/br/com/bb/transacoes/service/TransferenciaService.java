@@ -56,8 +56,15 @@ public class TransferenciaService {
     }
 
     private void validarPropriedadeConta(Conta origem) {
+        // 🛡️ PROTEÇÃO BANCÁRIA: Se não há principal ou nome, é uma anomalia de segurança
+        if (identity.getPrincipal() == null || identity.getPrincipal().getName() == null) {
+            Log.error("🚨 Falha crítica de segurança: Tentativa de operação sem identificação do Principal.");
+            throw new BusinessException("Operação não autorizada: Usuário não identificado.");
+        }
+
         String callerId = identity.getPrincipal().getName();
-        if (callerId == null || !origem.keycloakId.equals(callerId)) {
+
+        if (!origem.keycloakId.equals(callerId)) {
             Log.errorf("🚨 Tentativa de fraude: Usuário %s tentou usar conta de %s", callerId, origem.keycloakId);
             throw new BusinessException("Operação não autorizada para este usuário.");
         }
