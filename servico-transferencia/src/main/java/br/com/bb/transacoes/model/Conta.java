@@ -1,5 +1,6 @@
 package br.com.bb.transacoes.model;
 
+import br.com.bb.transacoes.exception.BusinessException;
 import io.quarkus.hibernate.orm.panache.PanacheEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -47,5 +48,22 @@ public class Conta extends PanacheEntity {
         return find("numero", numero)
                 .withLock(LockModeType.PESSIMISTIC_WRITE)
                 .firstResult();
+    }
+
+    public void debitar(BigDecimal valor) {
+        if (valor.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("Valor de débito deve ser positivo.");
+        }
+        if (this.saldo.compareTo(valor) < 0) {
+            throw new BusinessException("Saldo insuficiente para a operação.");
+        }
+        this.saldo = this.saldo.subtract(valor);
+    }
+
+    public void creditar(BigDecimal valor) {
+        if (valor.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("Valor de crédito deve ser positivo.");
+        }
+        this.saldo = this.saldo.add(valor);
     }
 }

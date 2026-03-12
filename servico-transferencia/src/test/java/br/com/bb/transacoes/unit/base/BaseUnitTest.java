@@ -13,9 +13,4 @@ import static org.mockito.Mockito.when;
 public abstract class BaseUnitTest implements TestConstants {
 
 
-    @BeforeEach
-    public void setupBase() {
-        PanacheMock.mock(Conta.class);
-        PanacheMock.mock(Transferencia.class);
-    }
 }
