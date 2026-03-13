@@ -16,14 +16,12 @@ import java.util.List;
 public class OutboxWorker {
 
     @Inject
-    @Channel("transferencias-concluidas") // Nome do canal no seu application.properties
+    @Channel("transferencias-concluidas")
     Emitter<String> kafkaEmitter;
 
-    // No BB, a latência deve ser baixa. 5 ou 10 segundos é um bom começo para dev.
     @Scheduled(every = "10s", identity = "transferencia-outbox-job")
     @Transactional
     public void processOutbox() {
-        // 1. Busca eventos não processados (ordenados pelo mais antigo para manter a ordem cronológica)
         List<OutboxEvent> events = OutboxEvent.find("processedAt is null order by createdAt asc").list();
 
         if (events.isEmpty()) return;
@@ -32,28 +30,26 @@ public class OutboxWorker {
 
         for (OutboxEvent event : events) {
             try {
-                // 2. Envio síncrono para garantir que o Kafka recebeu antes de marcar como processado
-                // O .toCompletableFuture().get() espera a confirmação (ACK) do Broker do Kafka
+                org.slf4j.MDC.put("correlationId", event.correlationId);
+
                 kafkaEmitter.send(event.payload)
                         .toCompletableFuture()
                         .get();
 
-                // 3. Sucesso: Marcamos o evento para não ser reenviado
                 event.processedAt = LocalDateTime.now();
                 event.persist();
 
                 Log.infof("✅ [Outbox] Evento %s (%s) enviado ao Kafka.", event.id, event.aggregateId);
 
             } catch (InterruptedException e) {
-                Thread.currentThread().interrupt(); // Boa prática: restaura o status de interrupção
+                Thread.currentThread().interrupt();
                 Log.error("🚨 [Outbox] Thread interrompida durante o processamento.");
                 break;
             } catch (Exception e) {
-                // 4. Falha: O evento continua com processedAt = null e será tentado no próximo ciclo
                 Log.errorf("❌ [Outbox] Falha ao enviar evento %s: %s. Re-tentativa em 10s.",
                         event.id, e.getMessage());
-                // IMPORTANTE: Em um banco, aqui poderíamos implementar um contador de tentativas
-                // para mover para uma tabela de 'failed_events' após X erros.
+            } finally {
+                org.slf4j.MDC.remove("correlationId");
             }
         }
     }

@@ -84,12 +84,20 @@ public class TransferenciaService {
     private void registrarEventoNoOutbox(TransferenciaDTO dto) {
         try {
             String payload = objectMapper.writeValueAsString(dto);
+            // Recupera o ID que o filtro colocou no MDC
+            String correlationId = org.slf4j.MDC.get("correlationId");
+            if (correlationId == null) {
+                correlationId = "test-" + java.util.UUID.randomUUID();
+            }
+
             OutboxEvent event = new OutboxEvent(
                     "TRANSFERENCIA",
                     dto.idempotencyKey(),
                     "TRANSFERENCIA_REALIZADA",
-                    payload
+                    payload,
+                    correlationId
             );
+            event.correlationId = correlationId; // Salva a "digital" no banco
             event.persist();
         } catch (Exception e) {
             Log.error("❌ Falha crítica ao gerar payload do Outbox", e);

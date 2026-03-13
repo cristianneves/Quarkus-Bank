@@ -216,4 +216,22 @@ public class TransferenciaServiceUnitTest extends BaseUnitTest {
         BusinessException ex = assertThrows(BusinessException.class, () -> service.realizarTransferencia(dto));
         assertEquals("Operação não autorizada para este usuário.", ex.getMessage());
     }
+
+    @Test
+    @TestSecurity(user = USER_ID, roles = "user")
+    @JwtSecurity(claims = { @Claim(key = "sub", value = USER_ID) })
+    @DisplayName("Service: Deve salvar o Correlation ID no OutboxEvent")
+    void deveSalvarCorrelationIdNoOutbox() {
+        TransferenciaDTO dto = TestDataFactory.novaTransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO, BigDecimal.TEN);
+
+        // Simulamos um ID já existente no MDC (como se tivesse vindo do Filtro)
+        String cidOriginal = "meu-id-rastreavel";
+        org.slf4j.MDC.put("correlationId", cidOriginal);
+
+        service.realizarTransferencia(dto);
+
+        OutboxEvent event = OutboxEvent.find("aggregateId", dto.idempotencyKey()).firstResult();
+        assertNotNull(event.correlationId);
+        assertEquals(cidOriginal, event.correlationId, "O ID no banco deve ser o mesmo do MDC");
+    }
 }
