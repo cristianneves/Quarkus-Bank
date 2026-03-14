@@ -38,25 +38,21 @@ public class TransferenciaService {
             throw new BusinessException("Conta de origem ou destino não localizada.");
         }
 
-        // 3. Segurança: Valida se o dono do token é o dono da conta de origem
         validarPropriedadeConta(origem);
 
-        // 4. Execução do Negócio (Modelo Rico)
         origem.debitar(dto.valor());
         destino.creditar(dto.valor());
 
-        // 5. Persistência do Histórico
         Transferencia historico = criarHistorico(dto);
         historico.persist();
 
-        // 6. REGISTRO NO OUTBOX (A substituição do envio direto ao Kafka)
         registrarEventoNoOutbox(dto);
 
         Log.infof("✅ Transferência %s processada e evento registrado no Outbox.", dto.idempotencyKey());
     }
 
     private void validarPropriedadeConta(Conta origem) {
-        // 🛡️ PROTEÇÃO BANCÁRIA: Se não há principal ou nome, é uma anomalia de segurança
+        //  PROTEÇÃO BANCÁRIA: Se não há principal ou nome, é uma anomalia de segurança
         if (identity.getPrincipal() == null || identity.getPrincipal().getName() == null) {
             Log.error("🚨 Falha crítica de segurança: Tentativa de operação sem identificação do Principal.");
             throw new BusinessException("Operação não autorizada: Usuário não identificado.");
