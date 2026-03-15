@@ -19,7 +19,7 @@ public class OutboxWorker {
     @Channel("pessoa-criada")
     Emitter<String> kafkaEmitter;
 
-    @Scheduled(every = "10s") // Varre o banco a cada 10 segundos
+    @Scheduled(every = "10s")
     @Transactional
     public void processOutbox() {
         List<OutboxEvent> events = OutboxEvent.find("processedAt is null").list();
@@ -32,20 +32,18 @@ public class OutboxWorker {
             try {
                 kafkaEmitter.send(event.payload)
                         .toCompletableFuture()
-                        .get(); // 🚀 Pode lançar ExecutionException ou InterruptedException
+                        .get();
 
                 event.processedAt = LocalDateTime.now();
                 event.persist();
                 Log.infof("Evento %d enviado ao Kafka com sucesso.", event.id);
 
             } catch (InterruptedException e) {
-                // 🔴 Regra de Ouro: Restaura o status de interrupção da Thread
                 Thread.currentThread().interrupt();
                 Log.errorf("Thread interrompida durante o envio do evento %d", event.id);
-                break; // Interrompe o loop, já que a thread deve parar
+                break;
 
             } catch (Exception e) {
-                // Trata outros erros (como falha de conexão no Kafka)
                 Log.errorf("Falha ao enviar evento %d: %s", event.id, e.getMessage());
             }
         }
