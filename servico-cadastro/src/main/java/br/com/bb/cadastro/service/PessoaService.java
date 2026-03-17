@@ -4,6 +4,7 @@ import br.com.bb.cadastro.dto.PessoaDTO;
 import br.com.bb.cadastro.model.OutboxEvent;
 import br.com.bb.cadastro.model.Pessoa;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -43,18 +44,7 @@ public class PessoaService {
         pessoa.persist();
 
         // 3. REGISTRO NO OUTBOX (A mágica da consistência)
-        try {
-            String jsonPayload = objectMapper.writeValueAsString(pessoa);
-            OutboxEvent event = new OutboxEvent(
-                    "PESSOA",
-                    pessoa.keycloakId,
-                    "PESSOA_CRIADA",
-                    jsonPayload
-            );
-            event.persist(); // Salvo na mesma transação da Pessoa!
-        } catch (Exception e) {
-            throw new RuntimeException("Erro ao gerar evento de outbox", e);
-        }
+        salvarNoOutbox(pessoa);
 
         return pessoa;
     }
@@ -105,14 +95,24 @@ public class PessoaService {
     private void salvarNoOutbox(Pessoa pessoa) {
         try {
             String jsonPayload = objectMapper.writeValueAsString(pessoa);
+
+            // 🛡️ Recupera o carimbo que o Filtro (Gateway/API) colocou no log
+            String correlationId = org.slf4j.MDC.get("correlationId");
+            if (correlationId == null) {
+                correlationId = "cad-" + java.util.UUID.randomUUID();
+            }
+
+            // Criamos o evento COM o Correlation ID (Certifique-se que o construtor da Entidade aceite esse campo)
             OutboxEvent event = new OutboxEvent(
                     "PESSOA",
                     pessoa.keycloakId,
                     "PESSOA_CRIADA",
-                    jsonPayload
+                    jsonPayload,
+                    correlationId
             );
             event.persist();
         } catch (Exception e) {
+            Log.error("❌ Falha ao registrar outbox de pessoa", e);
             throw new RuntimeException("Erro ao gerar evento de outbox", e);
         }
     }

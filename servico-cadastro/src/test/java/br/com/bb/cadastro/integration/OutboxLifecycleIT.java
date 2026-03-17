@@ -34,7 +34,7 @@ public class OutboxLifecycleIT extends BaseSecurityTest {
         // Processamento manual do Worker para validar integração
         worker.processOutbox();
 
-        InMemorySink<String> sink = connector.sink("pessoa-criada");
+        InMemorySink<String> sink = connector.sink("pessoa-registrada");
         await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
                 QuarkusTransaction.run(() -> {
                     OutboxEvent ev = (OutboxEvent) OutboxEvent.findAll().firstResult();
@@ -48,18 +48,13 @@ public class OutboxLifecycleIT extends BaseSecurityTest {
     @Test
     @DisplayName("Não deve marcar como processado se o Kafka falhar (Retry Logic)")
     void deveManterPendenteSeKafkaFalhar() {
-        // GIVEN: Um evento pendente no banco
+        // GIVEN: Um evento pendente no banco (Adicionado o 5º parâmetro "test-cid")
         io.quarkus.narayana.jta.QuarkusTransaction.requiringNew().run(() -> {
-            new OutboxEvent("PESSOA", "ID-FALHA", "TESTE", "{}").persist();
+            new OutboxEvent("PESSOA", "ID-FALHA", "TESTE", "{}", "test-cid-fail").persist();
         });
 
-        // 🚨 SIMULAMOS FALHA: O canal do Kafka não aceita mensagens (ou lança erro)
-        // No InMemoryConnector, podemos apenas não processar ou injetar um erro se fosse um mock
-        // Mas vamos testar o cenário onde o .get() lança exceção.
-
-        // Simulação: Vamos forçar um erro no worker interceptando o emitter se necessário,
-        // mas para este nível, vamos validar que o processedAt continua nulo se o try/catch for acionado.
-
+        // O worker tentará processar, mas como simulamos (ou esperamos) falha no setup do teste,
+        // ele cairá no catch do Worker.
         worker.processOutbox();
 
         // THEN: O evento DEVE continuar no banco como null para ser tentado novamente

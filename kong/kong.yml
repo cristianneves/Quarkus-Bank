@@ -1,0 +1,18 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  - name: transferencia-service
+    url: http://transferencia-service:8080 # Nome do seu serviço no docker-compose
+    routes:
+      - name: rota-transferencias
+        paths:
+          - /transferencias
+        strip_path: false # Mantém o /transferencias na URL enviada ao Quarkus
+
+plugins:
+  - name: correlation-id
+    config:
+      header_name: X-Correlation-ID
+      generator: uuid
+      echo_downstream: true # Devolve o ID para o cliente no header da resposta

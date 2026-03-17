@@ -43,3 +43,6 @@ Devemos usar nomes de serviços e abstrair as URLs para facilitar a promoção e
 
 -Rigor no SonarQube: Você excluiu DTOs e Models da análise. No padrão sênior, não há atalhos. Tudo que carrega anotações (como validações de CPF e
  Email) deve ser incluído na cobertura de testes para garantir que as regras de entrada nunca quebrem.
+
+
+ Idempotência no ContaConsumer para garantir que o seu banco nunca crie duas contas para a mesma pessoa, mesmo que receba o evento duas vezes

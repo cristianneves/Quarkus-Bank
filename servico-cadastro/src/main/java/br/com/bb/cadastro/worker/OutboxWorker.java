@@ -16,7 +16,7 @@ import java.util.List;
 public class OutboxWorker {
 
     @Inject
-    @Channel("pessoa-criada")
+    @Channel("pessoa-registrada")
     Emitter<String> kafkaEmitter;
 
     @Scheduled(every = "10s")

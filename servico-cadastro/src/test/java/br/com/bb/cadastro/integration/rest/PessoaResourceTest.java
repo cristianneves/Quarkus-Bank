@@ -28,7 +28,7 @@ public class PessoaResourceTest extends BaseSecurityTest {
     @BeforeEach
     @Transactional
     void setup() {
-        // 🧹 LIMPEZA OBRIGATÓRIA: Garante que o CPF não esteja no banco antes do teste rodar
+        org.slf4j.MDC.clear();
         OutboxEvent.deleteAll();
         Pessoa.deleteAll();
     }

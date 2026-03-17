@@ -1,3 +1,4 @@
+-- V1.0.0__Esquema_Inicial.sql
 CREATE TABLE pessoa (
     id BIGINT NOT NULL,
     nome VARCHAR(255) NOT NULL,

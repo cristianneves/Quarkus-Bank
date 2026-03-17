@@ -30,7 +30,8 @@ public class OutboxWorkerTest extends BaseSecurityTest {
     @DisplayName("Worker: Deve marcar como processado após envio com sucesso")
     void deveProcessarEventoComSucesso() {
         QuarkusTransaction.requiringNew().run(() -> {
-            new OutboxEvent("T", "1", "T", "{}").persist();
+            // Adicionado "cid-sucesso"
+            new OutboxEvent("T", "1", "T", "{}", "cid-sucesso").persist();
         });
 
         worker.processOutbox();
@@ -44,12 +45,12 @@ public class OutboxWorkerTest extends BaseSecurityTest {
     @Test
     @DisplayName("Worker: Deve processar evento pendente e marcar como processado")
     void deveProcessarEventoPendente() {
-        // Criamos um dado real para o Worker achar
         QuarkusTransaction.requiringNew().run(() -> {
-            new OutboxEvent("T", "1", "T", "{}").persist();
+            // Adicionado "cid-pendente"
+            new OutboxEvent("T", "1", "T", "{}", "cid-pendente").persist();
         });
 
-        worker.processOutbox(); // 🎯 Cobre as 52 instruções perdidas do processOutbox
+        worker.processOutbox();
 
         QuarkusTransaction.run(() -> {
             OutboxEvent ev = OutboxEvent.findAll().firstResult();
