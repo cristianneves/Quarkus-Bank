@@ -96,7 +96,6 @@ public class PessoaService {
         try {
             String jsonPayload = objectMapper.writeValueAsString(pessoa);
 
-            // 🛡️ Recupera o carimbo que o Filtro (Gateway/API) colocou no log
             String correlationId = org.slf4j.MDC.get("correlationId");
             if (correlationId == null) {
                 correlationId = "cad-" + java.util.UUID.randomUUID();
