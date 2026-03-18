@@ -30,7 +30,10 @@ public class PessoaService {
 
     @Transactional
     public Pessoa registrarNovoUsuario(PessoaDTO dto) {
+        // 1. Validações prévias lançando 409 (Conflict)
         validarCpfUnico(dto.cpf);
+        validarEmailUnico(dto.email);
+
         String keycloakId = criarUsuarioNoKeycloak(dto);
 
         try {
@@ -41,16 +44,21 @@ public class PessoaService {
             pessoa.cpf = dto.cpf;
             pessoa.email = dto.email;
             pessoa.keycloakId = keycloakId;
-            pessoa.persist();
 
-            // SINALIZA CRIAÇÃO
+            // FORÇA o Hibernate a testar o banco AGORA, dentro do try-catch
+            pessoa.persistAndFlush();
+
             salvarNoOutbox(pessoa, "PESSOA_CRIADA");
-
             return pessoa;
+
         } catch (Exception e) {
-            Log.errorf("🚨 Falha local. Removendo usuário %s do Keycloak.", keycloakId);
+            // 2. COMPENSAÇÃO: Se der qualquer erro no banco, limpa o Keycloak
+            Log.errorf("🚨 Erro na persistência. Limpando Keycloak ID: %s", keycloakId);
             removerUsuarioNoKeycloak(keycloakId);
-            throw new WebApplicationException("Erro ao salvar no banco. Cadastro revertido.", 500);
+
+            // 3. RELANÇA O ERRO: Não force 500 aqui!
+            // Se for um erro de banco (Unique Constraint), o Mapper vai pegar.
+            throw e;
         }
     }
 
@@ -68,43 +76,6 @@ public class PessoaService {
 
         return pessoa;
     }
-
-    @Transactional
-    public void excluirUsuarioCompleto(String email) {
-        Pessoa pessoa = Pessoa.find("email", email).firstResult();
-        if (pessoa == null) return;
-
-        String keycloakId = pessoa.keycloakId;
-
-        // SINALIZA EXCLUSÃO PARA O KAFKA
-        salvarNoOutbox(pessoa, "PESSOA_EXCLUIDA");
-
-        // Limpa Keycloak e Banco Local
-        removerUsuarioNoKeycloak(keycloakId);
-        pessoa.delete();
-        Log.infof("✅ Usuário %s removido com sucesso.", email);
-    }
-
-    private void salvarNoOutbox(Pessoa pessoa, String tipoEvento) {
-        try {
-            String jsonPayload = objectMapper.writeValueAsString(pessoa);
-            String cid = org.slf4j.MDC.get("correlationId");
-            if (cid == null) cid = "cad-" + UUID.randomUUID();
-
-            OutboxEvent event = new OutboxEvent(
-                    "PESSOA",
-                    pessoa.keycloakId,
-                    tipoEvento, // Agora o campo 'type' recebe o valor correto
-                    jsonPayload,
-                    cid
-            );
-            event.persist();
-        } catch (Exception e) {
-            Log.error("❌ Erro ao gerar Outbox", e);
-        }
-    }
-
-    // --- MÉTODOS AUXILIARES ---
 
     private String criarUsuarioNoKeycloak(PessoaDTO dto) {
         UserRepresentation user = new UserRepresentation();
@@ -126,6 +97,45 @@ public class PessoaService {
         return CreatedResponseUtil.getCreatedId(response);
     }
 
+    @Transactional
+    public void excluirUsuarioCompleto(String email) {
+        Pessoa pessoa = Pessoa.find("email", email).firstResult();
+        if (pessoa == null) return;
+
+        String keycloakId = pessoa.keycloakId;
+
+        // SINALIZA EXCLUSÃO PARA O KAFKA
+        salvarNoOutbox(pessoa, "PESSOA_EXCLUIDA");
+
+        // Limpa Keycloak e Banco Local
+        removerUsuarioNoKeycloak(keycloakId);
+        pessoa.delete();
+        Log.infof("✅ Usuário %s removido com sucesso.", email);
+    }
+
+
+
+    // --- MÉTODOS AUXILIARES ---
+
+    private void salvarNoOutbox(Pessoa pessoa, String tipoEvento) {
+        try {
+            String jsonPayload = objectMapper.writeValueAsString(pessoa);
+            String cid = org.slf4j.MDC.get("correlationId");
+            if (cid == null) cid = "cad-" + UUID.randomUUID();
+
+            OutboxEvent event = new OutboxEvent(
+                    "PESSOA",
+                    pessoa.keycloakId,
+                    tipoEvento, // Agora o campo 'type' recebe o valor correto
+                    jsonPayload,
+                    cid
+            );
+            event.persist();
+        } catch (Exception e) {
+            Log.error("❌ Erro ao gerar Outbox", e);
+        }
+    }
+
     private void atribuirRoleUsuario(String userId) {
         RoleRepresentation role = keycloak.realm("bank-realm").roles().get("user").toRepresentation();
         keycloak.realm("bank-realm").users().get(userId).roles().realmLevel().add(Collections.singletonList(role));
@@ -141,7 +151,13 @@ public class PessoaService {
 
     private void validarCpfUnico(String cpf) {
         if (Pessoa.find("cpf", cpf).firstResult() != null) {
-            throw new WebApplicationException("CPF já cadastrado!", 400);
+            throw new WebApplicationException("O CPF " + cpf + " já está cadastrado.", Response.Status.CONFLICT);
+        }
+    }
+
+    private void validarEmailUnico(String email) {
+        if (Pessoa.find("email", email).firstResult() != null) {
+            throw new WebApplicationException("O e-mail " + email + " já está em uso.", Response.Status.CONFLICT);
         }
     }
 }
