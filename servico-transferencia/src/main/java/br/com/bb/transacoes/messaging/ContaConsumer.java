@@ -4,18 +4,18 @@ import br.com.bb.transacoes.dto.PessoaEventDTO;
 import br.com.bb.transacoes.model.Conta;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.logging.Log;
-import io.smallrye.reactive.messaging.annotations.Blocking;
+import io.smallrye.common.annotation.Blocking; // 👈 Import correto
+import io.smallrye.reactive.messaging.kafka.api.IncomingKafkaRecordMetadata;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import org.apache.kafka.common.header.Header;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
 import org.eclipse.microprofile.reactive.messaging.Message;
-import io.smallrye.reactive.messaging.kafka.api.IncomingKafkaRecordMetadata;
-import java.nio.charset.StandardCharsets;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.concurrent.CompletionStage;
 
@@ -30,31 +30,34 @@ public class ContaConsumer {
     @Incoming("pessoa-registrada")
     @Transactional
     @Blocking
-    public CompletionStage<Void> criarContaAoCadastrarPessoa(Message<String> mensagem) {
+    public CompletionStage<Void> processarEventoPessoa(Message<String> mensagem) {
 
-        // 1. Extração do Correlation ID usando IncomingKafkaRecordMetadata
-        String correlationId = mensagem.getMetadata(IncomingKafkaRecordMetadata.class)
-                .map(metadata -> metadata.getHeaders().lastHeader("X-Correlation-ID"))
-                .map(Header::value)
-                .map(bytes -> new String(bytes, StandardCharsets.UTF_8))
-                .orElse("cid-auto-" + java.util.UUID.randomUUID());
+        var metadata = mensagem.getMetadata(IncomingKafkaRecordMetadata.class).orElse(null);
 
-        // 2. Carimba o Log
+        // 1. Extração do Correlation ID e do Tipo do Evento
+        String correlationId = extractHeader(metadata, "X-Correlation-ID", "cid-auto-" + java.util.UUID.randomUUID());
+        String eventType = extractHeader(metadata, "X-Event-Type", "PESSOA_CRIADA");
+
         org.slf4j.MDC.put("correlationId", correlationId);
 
         try {
-            // 3. Conversão do JSON para DTO
             PessoaEventDTO evento = objectMapper.readValue(mensagem.getPayload(), PessoaEventDTO.class);
 
-            Log.infof("📩 Processando abertura de conta: %s (ID: %s)", evento.nome(), evento.keycloakId());
+            // 2. Lógica de EXCLUSÃO
+            if ("PESSOA_EXCLUIDA".equals(eventType)) {
+                Log.warnf("🗑️ [Outbox] Removendo conta do usuário: %s", evento.keycloakId());
+                Conta.delete("keycloakId", evento.keycloakId());
+                return mensagem.ack();
+            }
 
-            // 4. Idempotência
+            // 3. Lógica de CRIAÇÃO
+            Log.infof("📩 Processando abertura de conta: %s", evento.nome());
+
             if (Conta.count("keycloakId", evento.keycloakId()) > 0) {
                 Log.warnf("⚠️ [Idempotência] Conta já existe para o ID: %s", evento.keycloakId());
                 return mensagem.ack();
             }
 
-            // 5. Criação da Conta
             Conta novaConta = new Conta();
             novaConta.keycloakId = evento.keycloakId();
             novaConta.agencia = "0001";
@@ -70,15 +73,21 @@ public class ContaConsumer {
             return mensagem.ack();
 
         } catch (Exception e) {
-            Log.errorf("🚨 Erro ao processar evento de conta: %s", e.getMessage());
+            Log.errorf("🚨 Erro ao processar evento [%s]: %s", eventType, e.getMessage());
             return mensagem.nack(e);
         } finally {
             org.slf4j.MDC.remove("correlationId");
         }
     }
 
+    private String extractHeader(IncomingKafkaRecordMetadata<?, ?> metadata, String key, String defaultValue) {
+        if (metadata == null) return defaultValue;
+        return metadata.getHeaders().lastHeader(key) != null
+                ? new String(metadata.getHeaders().lastHeader(key).value(), StandardCharsets.UTF_8)
+                : defaultValue;
+    }
+
     private String gerarNumeroContaUnico() {
-        // Simulação de geração
         return String.valueOf(RANDOM.nextInt(900000) + 100000);
     }
 }
