@@ -45,7 +45,6 @@ public class PessoaService {
             pessoa.email = dto.email;
             pessoa.keycloakId = keycloakId;
 
-            // FORÇA o Hibernate a testar o banco AGORA, dentro do try-catch
             pessoa.persistAndFlush();
 
             salvarNoOutbox(pessoa, "PESSOA_CRIADA");
@@ -56,8 +55,7 @@ public class PessoaService {
             Log.errorf("🚨 Erro na persistência. Limpando Keycloak ID: %s", keycloakId);
             removerUsuarioNoKeycloak(keycloakId);
 
-            // 3. RELANÇA O ERRO: Não force 500 aqui!
-            // Se for um erro de banco (Unique Constraint), o Mapper vai pegar.
+            // 3. RELANÇA O ERRO: Não force 500 aqui
             throw e;
         }
     }
@@ -71,7 +69,6 @@ public class PessoaService {
         pessoa.keycloakId = keycloakId;
         pessoa.persist();
 
-        // 🛠️ CORREÇÃO: Passando o segundo argumento necessário
         salvarNoOutbox(pessoa, "PESSOA_CRIADA");
 
         return pessoa;
@@ -104,7 +101,6 @@ public class PessoaService {
 
         String keycloakId = pessoa.keycloakId;
 
-        // SINALIZA EXCLUSÃO PARA O KAFKA
         salvarNoOutbox(pessoa, "PESSOA_EXCLUIDA");
 
         // Limpa Keycloak e Banco Local
