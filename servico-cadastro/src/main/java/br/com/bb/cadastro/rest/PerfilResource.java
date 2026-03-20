@@ -25,24 +25,25 @@ public class PerfilResource {
     ContaClient contaClient;
 
     @GET
-    @Authenticated // Garante que só usuários logados entrem
+    @Authenticated
     public PerfilDTO meuPerfil() {
         String sub = jwt.getSubject();
 
-        // 1. Busca a pessoa pelo ID do Keycloak
+        // 1. Busca a pessoa pelo ID do Keycloak (sub)
         Pessoa pessoa = Pessoa.find("keycloakId", sub).firstResult();
 
-        // 🚀 O SEGREDO DO 404: Se não achar, lança a exceção correta do JAX-RS
         if (pessoa == null) {
             throw new WebApplicationException("Perfil não localizado para o ID: " + sub, 404);
         }
 
-        // 2. Se chegou aqui, a pessoa existe. Agora é seguro chamar getNome()
         PerfilDTO perfil = new PerfilDTO();
-        perfil.nome = pessoa.nome; // Sem risco de NullPointerException agora
+        // --- MAPEAMENTO DOS DADOS LOCAIS ---
+        perfil.nome = pessoa.nome;
         perfil.cpf = pessoa.cpf;
+        perfil.email = pessoa.email;       // 👈 Faltava essa linha!
+        perfil.keycloakId = pessoa.keycloakId; // 👈 E essa também!
 
-        // 3. Busca dados da conta no outro microserviço
+        // 2. Busca dados da conta no microserviço de Transações
         try {
             String token = "Bearer " + jwt.getRawToken();
             ContaDTO conta = contaClient.buscarPorKeycloakId(sub, token);
@@ -52,7 +53,7 @@ public class PerfilResource {
             perfil.saldo = conta.saldo;
         } catch (Exception e) {
             Log.error("Falha ao integrar com serviço de contas", e);
-            throw new WebApplicationException("Erro ao buscar dados da conta no serviço de transações", 502);
+            throw new WebApplicationException("Erro ao buscar dados bancários", 502);
         }
 
         return perfil;
