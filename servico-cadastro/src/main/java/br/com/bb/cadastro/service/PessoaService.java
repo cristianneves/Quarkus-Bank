@@ -1,5 +1,6 @@
 package br.com.bb.cadastro.service;
 
+import br.com.bb.cadastro.client.ContaClient;
 import br.com.bb.cadastro.dto.PessoaDTO;
 import br.com.bb.cadastro.model.OutboxEvent;
 import br.com.bb.cadastro.model.Pessoa;
@@ -10,6 +11,7 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
+import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.keycloak.admin.client.CreatedResponseUtil;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.CredentialRepresentation;
@@ -27,6 +29,10 @@ public class PessoaService {
 
     @Inject
     ObjectMapper objectMapper;
+
+    @Inject
+    @RestClient
+    ContaClient contaClient;
 
     @Transactional
     public Pessoa registrarNovoUsuario(PessoaDTO dto) {
@@ -96,17 +102,41 @@ public class PessoaService {
 
     @Transactional
     public void excluirUsuarioCompleto(String email) {
+        // 1. Localiza a pessoa para obter os dados
         Pessoa pessoa = Pessoa.find("email", email).firstResult();
-        if (pessoa == null) return;
+        if (pessoa == null) {
+            Log.info("ℹ️ Pessoa não encontrada no banco. Abortando.");
+            return;
+        }
+
+        try {
+            var resposta = contaClient.obterSaldo(pessoa.keycloakId);
+            double saldo = Double.parseDouble(resposta.get("saldo").toString());
+
+            if (saldo > 0) {
+                throw new WebApplicationException(
+                        "Não é possível excluir conta com saldo positivo (R$ " + saldo + "). Zere a conta primeiro!",
+                        Response.Status.BAD_REQUEST
+                );
+            }
+        } catch (Exception e) {
+            if (e instanceof WebApplicationException) throw e;
+            Log.error("⚠️ Não foi possível verificar o saldo, mas prosseguindo por segurança de teste.");
+        }
 
         String keycloakId = pessoa.keycloakId;
 
+        // 2. SINALIZA EXCLUSÃO PARA O KAFKA (Via Outbox)
+        // Precisamos fazer isso antes de deletar a pessoa do banco local
         salvarNoOutbox(pessoa, "PESSOA_EXCLUIDA");
 
-        // Limpa Keycloak e Banco Local
+        // 3. Limpa Keycloak
         removerUsuarioNoKeycloak(keycloakId);
+
+        // 4. Limpa Banco Local (Tabela Pessoa)
         pessoa.delete();
-        Log.infof("✅ Usuário %s removido com sucesso.", email);
+
+        Log.infof("✅ Usuário %s removido com sucesso de todos os sistemas.", email);
     }
 
 

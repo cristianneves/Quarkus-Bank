@@ -45,7 +45,8 @@ public class ContaConsumer {
 
             // 2. Lógica de EXCLUSÃO
             if ("PESSOA_EXCLUIDA".equals(eventType)) {
-                Log.warnf("🗑️ [Outbox] Removendo conta do usuário: %s", evento.keycloakId());
+                Log.warnf("🗑️ [Sincronia] Removendo conta do usuário: %s", evento.keycloakId());
+                // Deleta a conta física vinculada ao ID do Keycloak
                 Conta.delete("keycloakId", evento.keycloakId());
                 return mensagem.ack();
             }
@@ -79,6 +80,7 @@ public class ContaConsumer {
             org.slf4j.MDC.remove("correlationId");
         }
     }
+
 
     private String extractHeader(IncomingKafkaRecordMetadata<?, ?> metadata, String key, String defaultValue) {
         if (metadata == null) return defaultValue;
