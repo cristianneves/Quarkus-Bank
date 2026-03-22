@@ -46,7 +46,6 @@ public class ContaConsumer {
             // 2. Lógica de EXCLUSÃO
             if ("PESSOA_EXCLUIDA".equals(eventType)) {
                 Log.warnf("🗑️ [Sincronia] Removendo conta do usuário: %s", evento.keycloakId());
-                // Deleta a conta física vinculada ao ID do Keycloak
                 Conta.delete("keycloakId", evento.keycloakId());
                 return mensagem.ack();
             }
