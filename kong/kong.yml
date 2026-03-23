@@ -2,17 +2,29 @@ _format_version: "3.0"
 _transform: true
 
 services:
+  # Rota para o Microserviço de Transações (8083)
   - name: transferencia-service
-    url: http://transferencia-service:8080 # Nome do seu serviço no docker-compose
+    url: http://servico-transferencia:8080 # Nome do serviço no docker-compose
     routes:
       - name: rota-transferencias
         paths:
           - /transferencias
-        strip_path: false # Mantém o /transferencias na URL enviada ao Quarkus
+        strip_path: false
+
+  # Rota para o Microserviço de Cadastro (8082)
+  - name: cadastro-service
+    url: http://servico-cadastro:8080 # Nome do serviço no docker-compose
+    routes:
+      - name: rota-cadastro
+        paths:
+          - /api/pessoas
+          - /api/perfil
+        strip_path: false
 
 plugins:
+  # Ativa o Correlation ID globalmente para rastrear a requisição em todos os serviços
   - name: correlation-id
     config:
       header_name: X-Correlation-ID
       generator: uuid
-      echo_downstream: true # Devolve o ID para o cliente no header da resposta
+      echo_downstream: true

@@ -2,22 +2,23 @@ services:
 
   kong:
     image: kong:latest
-    volumes:
-      - ./kong:/usr/local/kong/declarative
+    container_name: kong-gateway
+    user: "root" # Garante permissão para ler os volumes
     environment:
-      KONG_DATABASE: "off" # Ativa o modo DB-less
+      KONG_DATABASE: "off"
       KONG_DECLARATIVE_CONFIG: /usr/local/kong/declarative/kong.yml
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_ADMIN_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_ADMIN_ERROR_LOG: /dev/stderr
-      KONG_ADMIN_LISTEN: 0.0.0.0:8001, 0.0.0.0:8444 ssl
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+    volumes:
+      - ./kong:/usr/local/kong/declarative
     ports:
-      - "8000:8000" # Porta onde o cliente vai bater (Gateway)
-      - "8443:8443" # HTTPS
-      - "8001:8001" # Admin API (opcional para inspeção)
+      - "8000:8000" # Porta de entrada (Postman vai bater aqui agora)
+      - "8001:8001" # Porta de Admin (Para você ver as rotas se quiser)
     networks:
-      - bank-network
+      - bank-network # A mesma network dos seus outros serviços
 
   # Base de dados exclusiva para o Cadastro (Porto 5432)
   db-cadastro:
