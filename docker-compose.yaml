@@ -15,21 +15,6 @@ services:
       - "8001:8001"
     networks:
       - bank-network
-
-  servico-cadastro:
-    profiles: [ "apps" ] # 👈 Só sobe com --profile apps
-    build:
-      context: ./servico-cadastro
-      dockerfile: Dockerfile
-    container_name: servico-cadastro
-    environment:
-      - DB_HOST=db-cadastro
-      - DB_PORT=5432
-      - KAFKA_URL=redpanda-estavel:29092
-      - KC_URL=http://keycloak-estavel:8080
-      - URL_TRANSF=http://servico-transferencia:8083
-    networks:
-      - bank-network
     depends_on:
       - db-cadastro
 
