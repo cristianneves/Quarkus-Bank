@@ -1,5 +1,6 @@
-*
-!target/*-runner
-!target/*-runner.jar
-!target/lib/*
-!target/quarkus-app/*
+# Ignora apenas o lixo e o que já foi compilado localmente
+target/
+.idea/
+.mvn/
+*.iml
+.git/

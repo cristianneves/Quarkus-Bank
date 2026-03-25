@@ -4,11 +4,13 @@ import br.com.bb.cadastro.dto.PessoaDTO;
 import br.com.bb.cadastro.integration.base.BaseSecurityTest;
 import br.com.bb.cadastro.model.OutboxEvent;
 import br.com.bb.cadastro.model.Pessoa;
+import br.com.bb.cadastro.service.PessoaService;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.security.TestSecurity;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.junit.jupiter.api.Assertions;
@@ -25,10 +27,13 @@ public class PessoaResourceTest extends BaseSecurityTest {
     @InjectMock
     JsonWebToken jwt;
 
+    @Inject
+    PessoaService service;
+
     @BeforeEach
     @Transactional
     void setup() {
-        // 🧹 LIMPEZA OBRIGATÓRIA: Garante que o CPF não esteja no banco antes do teste rodar
+        org.slf4j.MDC.clear();
         OutboxEvent.deleteAll();
         Pessoa.deleteAll();
     }
@@ -72,9 +77,35 @@ public class PessoaResourceTest extends BaseSecurityTest {
         RestAssured.given()
                 .contentType(io.restassured.http.ContentType.JSON)
                 .body(dto)
-                .when().post("/api/pessoas/registrar") // Ajuste para a rota correta do seu DTO
+                .when().post("/api/pessoas/registrar")
                 .then()
                 .statusCode(201)
                 .body("nome", is(dto.nome));
+    }
+
+    @Test
+    @DisplayName("REST: Deve excluir pessoa via DELETE")
+    void deveExcluirPessoa() {
+        setupKeycloakMockSuccess();
+        PessoaDTO dto = criarPessoaDTO();
+        dto.email = "excluir@bb.com.br";
+        
+        service.registrarNovoUsuario(dto);
+
+        RestAssured.given()
+                .when().delete("/api/pessoas/" + dto.email)
+                .then()
+                .statusCode(204);
+
+        Assertions.assertEquals(0, Pessoa.count());
+    }
+
+    @Test
+    @DisplayName("REST: DELETE deve retornar 204 mesmo se pessoa não existir")
+    void deveRetornar204QuandoPessoaNaoExiste() {
+        RestAssured.given()
+                .when().delete("/api/pessoas/naoexiste@bb.com.br")
+                .then()
+                .statusCode(204);
     }
 }

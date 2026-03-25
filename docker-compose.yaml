@@ -1,4 +1,39 @@
 services:
+
+  kong:
+    image: kong:latest
+    container_name: kong-gateway
+    user: "root"
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/declarative/kong.yml
+      # ... (logs simplificados para o exemplo)
+    volumes:
+      - ./kong:/usr/local/kong/declarative
+    ports:
+      - "8000:8000" # ÚNICA PORTA DE ENTRADA PARA A API
+      - "8001:8001"
+    networks:
+      - bank-network
+    depends_on:
+      - db-cadastro
+
+  servico-transferencia:
+    profiles: [ "apps" ] # 👈 Só sobe com --profile apps
+    build:
+      context: ./servico-transferencia
+      dockerfile: Dockerfile
+    container_name: servico-transferencia
+    environment:
+      - DB_HOST=db-transferencia
+      - DB_PORT=5432
+      - KAFKA_URL=redpanda-estavel:29092
+      - KC_URL=http://keycloak-estavel:8080
+    networks:
+      - bank-network
+    depends_on:
+      - db-transferencia
+
   # Base de dados exclusiva para o Cadastro (Porto 5432)
   db-cadastro:
     image: postgres:17

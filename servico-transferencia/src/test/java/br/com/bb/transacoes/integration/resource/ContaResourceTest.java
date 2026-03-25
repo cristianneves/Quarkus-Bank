@@ -48,6 +48,28 @@ public class ContaResourceTest extends BaseIntegrationTest {
                 .then()
                 .statusCode(200)
                 .body("keycloakId", is(USER_ID))
-                .body("numero", is(CONTA_ORIGEM)); // Agora as strings batem!
+                .body("numero", is(CONTA_ORIGEM));
+    }
+
+    @Test
+    @TestSecurity(user = USER_ID, roles = "user")
+    @DisplayName("REST: Deve retornar saldo por KeycloakID")
+    public void deveRetornarSaldo() {
+        given()
+                .pathParam("keycloakId", USER_ID)
+                .when().get("/api/contas/saldo/{keycloakId}")
+                .then()
+                .statusCode(200)
+                .body("saldo", notNullValue());
+    }
+
+    @Test
+    @DisplayName("REST: Deve retornar 404 para conta inexistente")
+    public void deveRetornar404ParaContaInexistente() {
+        given()
+                .pathParam("keycloakId", "NAO-EXISTE")
+                .when().get("/api/contas/saldo/{keycloakId}")
+                .then()
+                .statusCode(404);
     }
 }

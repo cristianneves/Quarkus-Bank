@@ -28,4 +28,17 @@ public class CorrelationIdFilterTest {
         verify(context).setProperty(eq(CorrelationIdFilter.MDC_KEY), anyString());
         assertNotNull(org.slf4j.MDC.get(CorrelationIdFilter.MDC_KEY));
     }
+
+    @Test
+    @DisplayName("Filtro: Deve manter Correlation ID se o header já existir")
+    void deveManterIdSeExistir() {
+        ContainerRequestContext context = mock(ContainerRequestContext.class);
+        String cidExistente = "id-pre-existente";
+        when(context.getHeaderString(CorrelationIdFilter.CORRELATION_ID_HEADER)).thenReturn(cidExistente);
+
+        filter.filter(context);
+
+        verify(context).setProperty(CorrelationIdFilter.MDC_KEY, cidExistente);
+        org.junit.jupiter.api.Assertions.assertEquals(cidExistente, org.slf4j.MDC.get(CorrelationIdFilter.MDC_KEY));
+    }
 }

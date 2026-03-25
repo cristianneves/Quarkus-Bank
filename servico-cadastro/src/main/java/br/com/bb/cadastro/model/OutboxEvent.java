@@ -22,6 +22,9 @@ public class OutboxEvent extends PanacheEntity {
     @Column(columnDefinition = "TEXT", nullable = false)
     public String payload;       // O JSON da mensagem
 
+    @Column(name = "correlation_id", nullable = false)
+    public String correlationId;
+
     @Column(nullable = false)
     public LocalDateTime createdAt;
 
@@ -29,11 +32,12 @@ public class OutboxEvent extends PanacheEntity {
 
     public OutboxEvent() {}
 
-    public OutboxEvent(String aggregateType, String aggregateId, String type, String payload) {
+    public OutboxEvent(String aggregateType, String aggregateId, String type, String payload, String correlationId) {
         this.aggregateType = aggregateType;
         this.aggregateId = aggregateId;
         this.type = type;
         this.payload = payload;
+        this.correlationId = correlationId;
         this.createdAt = LocalDateTime.now();
     }
 }

@@ -7,10 +7,8 @@ import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
-import jakarta.ws.rs.Consumes;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.Produces;
+import jakarta.validation.Valid;
+import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.jwt.JsonWebToken;
@@ -37,10 +35,18 @@ public class PessoaResource {
     }
 
     @POST
-    @Path("/registrar") // Novo endpoint público
-    @PermitAll // Qualquer um pode acessar para se cadastrar
-    public Response registrar(PessoaDTO dto) {
+    @Path("/registrar")
+    @PermitAll
+    public Response registrar(@Valid PessoaDTO dto) {
         Pessoa pessoa = pessoaService.registrarNovoUsuario(dto);
         return Response.status(Response.Status.CREATED).entity(pessoa).build();
+    }
+
+    @DELETE
+    @Path("/{email}")
+    @PermitAll
+    public Response excluir(@PathParam("email") String email) {
+        pessoaService.excluirUsuarioCompleto(email);
+        return Response.noContent().build();
     }
 }

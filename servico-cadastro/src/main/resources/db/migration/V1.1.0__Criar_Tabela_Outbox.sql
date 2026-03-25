@@ -1,3 +1,4 @@
+-- V1.1.0__Criar_Tabela_Outbox.sql
 CREATE TABLE outbox_event (
     id BIGINT NOT NULL,
     aggregateType VARCHAR(50) NOT NULL,
