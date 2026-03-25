@@ -13,6 +13,12 @@ public class GlobalExceptionMapper implements ExceptionMapper<Throwable> {
 
     @Override
     public Response toResponse(Throwable exception) {
+        if (exception == null) {
+            return Response.status(500)
+                    .entity(Map.of("erro", "Erro interno no servidor", "msg", "Erro desconhecido"))
+                    .build();
+        }
+
         // 1. Erros que nós lançamos manualmente (400, 404, 409...)
         if (exception instanceof WebApplicationException) {
             WebApplicationException e = (WebApplicationException) exception;
@@ -41,8 +47,9 @@ public class GlobalExceptionMapper implements ExceptionMapper<Throwable> {
         }
 
         // 4. Erro 500 Genérico (Último caso)
+        String message = exception.getMessage() != null ? exception.getMessage() : "Erro desconhecido";
         return Response.status(500)
-                .entity(Map.of("erro", "Erro interno no servidor", "msg", exception.getMessage()))
+                .entity(Map.of("erro", "Erro interno no servidor", "msg", message))
                 .build();
     }
 

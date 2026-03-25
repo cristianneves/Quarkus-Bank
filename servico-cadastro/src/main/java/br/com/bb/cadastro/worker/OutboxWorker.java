@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @ApplicationScoped
 public class OutboxWorker {
@@ -36,7 +37,7 @@ public class OutboxWorker {
                 OutgoingKafkaRecordMetadata<String> metadata = OutgoingKafkaRecordMetadata.<String>builder()
                         .withHeaders(new RecordHeaders()
                                 .add("X-Correlation-ID", event.correlationId.getBytes())
-                                .add("X-Event-Type", event.type.getBytes())) // 👈 CORRIGIDO: de eventType para type
+                                .add("X-Event-Type", event.type.getBytes()))
                         .build();
 
                 Message<String> message = Message.of(event.payload)
@@ -49,8 +50,12 @@ public class OutboxWorker {
 
                 event.processedAt = LocalDateTime.now();
                 event.persist();
-                Log.infof("✅ Evento %s (%s) enviado ao Kafka.", event.id, event.type); // 👈 CORRIGIDO
+                Log.infof("✅ Evento %s (%s) enviado ao Kafka.", event.id, event.type);
 
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                Log.errorf("❌ Thread interrompida durante processamento do Outbox %d: %s", event.id, e.getMessage());
+                break;
             } catch (Exception e) {
                 Log.errorf("❌ Falha no Outbox %d: %s", event.id, e.getMessage());
             }
