@@ -2,6 +2,7 @@ package br.com.bb.transacoes.it;
 
 import br.com.bb.transacoes.dto.PessoaEventDTO;
 import br.com.bb.transacoes.model.Conta;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.reactive.messaging.memory.InMemoryConnector;
 import jakarta.enterprise.inject.Any;
@@ -18,8 +19,11 @@ public class ContaIntegrationTest {
     @Any
     InMemoryConnector connector; // O "simulador" de Kafka
 
+    @Inject
+    ObjectMapper objectMapper;
+
     @Test
-    public void deveCriarContaQuandoReceberEventoDoKafka() throws InterruptedException {
+    public void deveCriarContaQuandoReceberEventoDoKafka() throws InterruptedException, Exception {
         // 1. Criamos um ID aleatório para não chocar com lixo de outros testes
         String keycloakId = UUID.randomUUID().toString();
 
@@ -31,10 +35,11 @@ public class ContaIntegrationTest {
                 "teste@pipeline.com"
         );
 
-        // 3. Injetamos o evento no canal de entrada (Incoming)
-        connector.source("pessoa-registrada").send(evento);
+        // 3. Injetamos o evento no canal de entrada (como String JSON)
+        String json = objectMapper.writeValueAsString(evento);
+        connector.source("pessoa-registrada").send(json);
 
-        // 4. Esperamos 1 segundo para o banco processar
+        // 4. esperamos 1 segundo para o banco processar
         Thread.sleep(1000);
 
         // 5. VALIDAÇÃO PROFISSIONAL: Buscamos direto no banco

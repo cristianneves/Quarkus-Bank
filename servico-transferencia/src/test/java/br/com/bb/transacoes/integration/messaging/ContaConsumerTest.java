@@ -1,9 +1,12 @@
 package br.com.bb.transacoes.integration.messaging;
 
 import br.com.bb.transacoes.base.TestDataFactory;
+import br.com.bb.transacoes.dto.PessoaEventDTO;
 import br.com.bb.transacoes.integration.base.BaseMessagingTest;
 import br.com.bb.transacoes.model.Conta;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +21,9 @@ public class ContaConsumerTest extends BaseMessagingTest {
 
     private static final String CANAL_ENTRADA = "pessoa-registrada";
 
+    @Inject
+    ObjectMapper objectMapper;
+
     @BeforeEach
     @Transactional
     void limparDadosDeTeste() {
@@ -26,10 +32,11 @@ public class ContaConsumerTest extends BaseMessagingTest {
 
     @Test
     @DisplayName("Deve criar uma conta no banco ao receber mensagem do Kafka")
-    public void deveProcessarMensagemDeNovoCadastro() {
+    public void deveProcessarMensagemDeNovoCadastro() throws Exception {
         String id = "user-id-001";
-
-        enviarMensagem(CANAL_ENTRADA, TestDataFactory.novoEventoPessoa(id, getCpfFake()));
+        PessoaEventDTO evento = TestDataFactory.novoEventoPessoa(id, getCpfFake());
+        String json = objectMapper.writeValueAsString(evento);
+        enviarMensagem(CANAL_ENTRADA, json);
 
         aguardarProcessamento(() -> {
             Conta conta = Conta.find("keycloakId", id).firstResult();
@@ -40,12 +47,13 @@ public class ContaConsumerTest extends BaseMessagingTest {
 
     @Test
     @DisplayName("Não deve criar conta duplicada (Idempotência)")
-    public void naoDeveCriarContaDuplicada() {
+    public void naoDeveCriarContaDuplicada() throws Exception {
         String id = "user-repetido-999";
         var evento = TestDataFactory.novoEventoPessoa(id, "11122233344");
+        String json = objectMapper.writeValueAsString(evento);
 
-        enviarMensagem(CANAL_ENTRADA, evento);
-        enviarMensagem(CANAL_ENTRADA, evento);
+        enviarMensagem(CANAL_ENTRADA, json);
+        enviarMensagem(CANAL_ENTRADA, json);
 
         aguardarProcessamento(() -> {
             Assertions.assertEquals(1, Conta.find("keycloakId", id).count());
@@ -54,16 +62,13 @@ public class ContaConsumerTest extends BaseMessagingTest {
 
     @Test
     @DisplayName("Kafka: Deve logar erro ao falhar na persistência (Catch block)")
-    public void deveTratarErroNoConsumer() {
-        // 🎯 Enviamos um KeycloakId nulo.
-        // Como marcamos nullable = false no model, o persist() VAI explodir.
+    public void deveTratarErroNoConsumer() throws Exception {
         var eventoComErro = TestDataFactory.novoEventoPessoa(null, "12345678901");
+        String json = objectMapper.writeValueAsString(eventoComErro);
 
-        enviarMensagem(CANAL_ENTRADA, eventoComErro);
+        enviarMensagem(CANAL_ENTRADA, json);
 
         aguardarProcessamento(() -> {
-            // Agora, como o persist() falhou, a busca não deve retornar nada
-            // Buscamos pelo CPF para garantir que nada com esse documento foi criado
             Conta conta = Conta.find("cpfTitular", "12345678901").firstResult();
             assertNull(conta, "A conta não deveria existir porque o persist falhou");
         });
