@@ -10,9 +10,11 @@ import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.junit.jupiter.api.*;
 import org.keycloak.admin.client.resource.RealmResource;
+import org.keycloak.admin.client.resource.UsersResource;
 
 import java.util.Map;
 
@@ -144,5 +146,16 @@ public class PessoaServiceTest extends BaseSecurityTest {
             () -> service.registrarNovoUsuario(dto));
         
         assertEquals(409, ex.getResponse().getStatus());
+    }
+
+    @Test
+    @DisplayName("Deve falhar se Keycloak retornar status diferente de 201")
+    void deveFalharQuandoKeycloakRetornaErro() {
+        UsersResource usersResource = mock(UsersResource.class);
+        when(keycloak.realm("bank-realm")).thenReturn(mock(RealmResource.class));
+        when(keycloak.realm("bank-realm").users()).thenReturn(usersResource);
+        when(usersResource.create(any())).thenReturn(Response.status(400).build());
+
+        assertThrows(RuntimeException.class, () -> service.registrarNovoUsuario(criarPessoaDTO()));
     }
 }
