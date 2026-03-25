@@ -7,6 +7,7 @@ import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
+import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -34,17 +35,16 @@ public class PessoaResource {
     }
 
     @POST
-    @Path("/registrar") // Novo endpoint público
-    @PermitAll // Qualquer um pode acessar para se cadastrar
-    public Response registrar(PessoaDTO dto) {
+    @Path("/registrar")
+    @PermitAll
+    public Response registrar(@Valid PessoaDTO dto) {
         Pessoa pessoa = pessoaService.registrarNovoUsuario(dto);
         return Response.status(Response.Status.CREATED).entity(pessoa).build();
     }
 
-    // Adicione este método ao final da sua classe PessoaResource
     @DELETE
     @Path("/{email}")
-    @PermitAll // Aberto para facilitar seus testes agora
+    @PermitAll
     public Response excluir(@PathParam("email") String email) {
         pessoaService.excluirUsuarioCompleto(email);
         return Response.noContent().build();
