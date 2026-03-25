@@ -5,6 +5,7 @@ import br.com.bb.transacoes.dto.PessoaEventDTO;
 import br.com.bb.transacoes.integration.base.BaseMessagingTest;
 import br.com.bb.transacoes.model.Conta;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -27,7 +29,7 @@ public class ContaConsumerTest extends BaseMessagingTest {
     @BeforeEach
     @Transactional
     void limparDadosDeTeste() {
-        Conta.delete("keycloakId = ?1 OR keycloakId = ?2", "user-id-001", "user-repetido-999");
+        Conta.delete("keycloakId = ?1 OR keycloakId = ?2 OR keycloakId = ?3", "user-id-001", "user-repetido-999", "user-excluir");
     }
 
     @Test
@@ -71,6 +73,49 @@ public class ContaConsumerTest extends BaseMessagingTest {
         aguardarProcessamento(() -> {
             Conta conta = Conta.find("cpfTitular", "12345678901").firstResult();
             assertNull(conta, "A conta não deveria existir porque o persist falhou");
+        });
+    }
+
+    @Test
+    @DisplayName("Kafka: Deve remover conta ao receber evento de exclusão")
+    public void deveRemoverContaAoExcluirPessoa() throws Exception {
+        String id = "user-excluir";
+
+        // GIVEN: Existe uma conta
+        QuarkusTransaction.requiringNew().run(() -> {
+            Conta c = new Conta();
+            c.keycloakId = id;
+            c.numero = "998877";
+            c.agencia = "0001";
+            c.saldo = BigDecimal.ZERO;
+            c.cpfTitular = "000.000.000-00";
+            c.persist();
+        });
+
+        // WHEN: Recebe evento de exclusão
+        var evento = TestDataFactory.novoEventoPessoa(id, "000.000.000-00");
+        String json = objectMapper.writeValueAsString(evento);
+
+        enviarMensagemComHeaders(CANAL_ENTRADA, json, Map.of("X-Event-Type", "PESSOA_EXCLUIDA"));
+
+        // THEN: Conta deve sumir
+        aguardarProcessamento(() -> {
+            Assertions.assertEquals(0, Conta.count("keycloakId", id));
+        });
+    }
+
+    @Test
+    @DisplayName("Kafka: Deve processar mensagem sem qualquer metadata (cobertura extractHeader)")
+    public void deveProcessarMensagemSemMetadata() throws Exception {
+        String id = "user-no-metadata";
+        var evento = TestDataFactory.novoEventoPessoa(id, "000.000.000-01");
+        String json = objectMapper.writeValueAsString(evento);
+
+        // Envia sem o método 'ComHeaders', logo metadata virá null no consumer
+        enviarMensagem(CANAL_ENTRADA, json);
+
+        aguardarProcessamento(() -> {
+            Assertions.assertEquals(1, Conta.count("keycloakId", id));
         });
     }
 }

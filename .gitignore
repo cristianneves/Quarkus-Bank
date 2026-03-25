@@ -3,3 +3,4 @@
 jacoco.exec
 jacoco-report/
 .env
+docs/

@@ -124,7 +124,19 @@ public class OutboxWorkerTest extends BaseMessagingTest {
     }
 
     @Test
-    @DisplayName("Worker: Deve garantir que o MDC é limpo mesmo após falha")
+    @DisplayName("Worker: Deve ignorar se a lista de eventos estiver vazia")
+    @Transactional
+    void deveIgnorarSeListaVazia() {
+        OutboxEvent.deleteAll();
+
+        assertDoesNotThrow(() -> worker.processOutbox());
+
+        InMemorySink<String> sink = connector.sink("transferencias-concluidas");
+        assertEquals(0, sink.received().size(), "Não deveria ter enviado nada");
+    }
+
+    @Test
+    @DisplayName("Worker: Deve limpar MDC após falha")
     @Transactional
     void deveLimparMdcAposFalha() {
         OutboxEvent event = new OutboxEvent("T", "2", "R", "{}", "cid-falha");
