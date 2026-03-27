@@ -10,6 +10,9 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.WebApplicationException;
+import java.math.BigDecimal;
+import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+import org.eclipse.microprofile.faulttolerance.Fallback;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
@@ -26,6 +29,13 @@ public class PerfilResource {
 
     @GET
     @Authenticated
+    @CircuitBreaker(
+            requestVolumeThreshold = 4,
+            failureRatio = 0.5,
+            delay = 5000,
+            successThreshold = 2
+    )
+    @Fallback(fallbackMethod = "meuPerfilFallback")
     public PerfilDTO meuPerfil() {
         String sub = jwt.getSubject();
 
@@ -40,22 +50,43 @@ public class PerfilResource {
         // --- MAPEAMENTO DOS DADOS LOCAIS ---
         perfil.nome = pessoa.nome;
         perfil.cpf = pessoa.cpf;
-        perfil.email = pessoa.email;       // 👈 Faltava essa linha!
-        perfil.keycloakId = pessoa.keycloakId; // 👈 E essa também!
+        perfil.email = pessoa.email;
+        perfil.keycloakId = pessoa.keycloakId;
 
         // 2. Busca dados da conta no microserviço de Transações
-        try {
-            String token = "Bearer " + jwt.getRawToken();
-            ContaDTO conta = contaClient.buscarPorKeycloakId(sub, token);
+        String token = "Bearer " + jwt.getRawToken();
+        ContaDTO conta = contaClient.buscarPorKeycloakId(sub, token);
 
-            perfil.numeroConta = conta.numero;
-            perfil.agencia = conta.agencia;
-            perfil.saldo = conta.saldo;
-        } catch (Exception e) {
-            Log.error("Falha ao integrar com serviço de contas", e);
-            throw new WebApplicationException("Erro ao buscar dados bancários", 502);
+        perfil.numeroConta = conta.numero;
+        perfil.agencia = conta.agencia;
+        perfil.saldo = conta.saldo;
+
+        return perfil;
+    }
+
+    public PerfilDTO meuPerfilFallback() {
+        Log.warn("⚠️ Circuit Breaker Ativado: Usando Fallback para Perfil");
+        String sub = jwt.getSubject();
+        Pessoa pessoa = Pessoa.find("keycloakId", sub).firstResult();
+
+        if (pessoa == null) {
+            throw new WebApplicationException("Perfil não localizado para o ID: " + sub, 404);
         }
 
+        PerfilDTO perfil = new PerfilDTO();
+        perfil.nome = pessoa.nome;
+        perfil.cpf = pessoa.cpf;
+        perfil.email = pessoa.email;
+        perfil.keycloakId = pessoa.keycloakId;
+
+        // Dados de Fallback (Saldo indisponível)
+        perfil.numeroConta = "N/A";
+        perfil.agencia = "N/A";
+        perfil.saldo = BigDecimal.ZERO; 
+        
+        // Adicionamos um log indicando que o saldo é parcial
+        Log.info("ℹ️ Dados bancários indisponíveis. Retornando apenas dados cadastrais.");
+        
         return perfil;
     }
 }

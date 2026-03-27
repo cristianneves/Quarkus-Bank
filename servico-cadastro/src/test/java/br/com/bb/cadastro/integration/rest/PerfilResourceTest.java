@@ -73,8 +73,8 @@ public class PerfilResourceTest extends BaseSecurityTest {
     @Test
     @TestSecurity(user = "test-user", roles = {"user"})
     @ActivateRequestContext
-    @DisplayName("Deve retornar 502 quando o serviço de conta está fora do ar")
-    void deveRetornar502QuandoServicoContaFalha() {
+    @DisplayName("RESILIÊNCIA: Deve retornar Fallback (200 OK + N/A) quando o serviço de conta falha")
+    void deveRetornarDadosParciaisComFallbackQuandoServicoContaFalha() {
         mockJwtSubject(USER_ID);
         when(jwt.getRawToken()).thenReturn("token");
 
@@ -86,13 +86,18 @@ public class PerfilResourceTest extends BaseSecurityTest {
             p.persist();
         });
 
-        // Simula erro no Rest Client (Microprofile Rest Client lança WebApplicationException)
+        // Simula erro no Rest Client (Ex: Time-out ou 500)
         when(contaClient.buscarPorKeycloakId(any(), any()))
                 .thenThrow(new jakarta.ws.rs.WebApplicationException(500));
 
+        // AGORA: O sistema deve responder 200 com os dados de Fallback!
         RestAssured.given()
                 .when().get("/api/perfil")
                 .then()
-                .statusCode(502);
+                .statusCode(200)
+                .body("nome", is("Crislan"))
+                .body("numeroConta", is("N/A"))
+                .body("agencia", is("N/A"))
+                .body("saldo", is(0));
     }
 }
