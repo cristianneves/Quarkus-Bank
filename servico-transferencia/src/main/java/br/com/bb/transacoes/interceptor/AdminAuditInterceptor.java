@@ -29,7 +29,6 @@ public class AdminAuditInterceptor {
         try {
             Object result = context.proceed();
 
-            // 2. Grava o log de SUCESSO em uma NOVA transação isolada
             QuarkusTransaction.requiringNew().run(() -> {
                 new Auditoria(adminName, methodName, "SUCESSO: " + parameters).persist();
             });
