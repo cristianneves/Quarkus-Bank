@@ -27,7 +27,6 @@ public class AdminAuditInterceptor {
         String parameters = Arrays.toString(context.getParameters());
 
         try {
-            // 1. Executa a operação real (o depósito no service)
             Object result = context.proceed();
 
             // 2. Grava o log de SUCESSO em uma NOVA transação isolada
