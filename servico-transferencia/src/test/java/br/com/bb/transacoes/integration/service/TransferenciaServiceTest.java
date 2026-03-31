@@ -7,10 +7,12 @@ import br.com.bb.transacoes.integration.base.BaseMessagingTest;
 import br.com.bb.transacoes.model.Conta;
 import br.com.bb.transacoes.model.OutboxEvent;
 import br.com.bb.transacoes.model.Transferencia;
+import br.com.bb.transacoes.service.IdempotencyClaimService;
 import br.com.bb.transacoes.service.TransferenciaService;
 import io.quarkus.panache.mock.PanacheMock;
+import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.security.TestSecurity; // 🚀 Importante
+import io.quarkus.test.security.TestSecurity;
 import io.quarkus.test.security.jwt.Claim;
 import io.quarkus.test.security.jwt.JwtSecurity;
 import jakarta.inject.Inject;
@@ -30,6 +32,15 @@ public class TransferenciaServiceTest extends BaseMessagingTest {
     @Inject
     TransferenciaService service;
 
+    /**
+     * Mock do IdempotencyClaimService: isola o INSERT nativo (PostgreSQL) do
+     * ambiente de PanacheMock. Sem este mock, Transferencia.getEntityManager()
+     * retornaria null e todos os testes quebrariam com NPE antes de chegar
+     * qualquer lógica de negócio.
+     */
+    @InjectMock
+    IdempotencyClaimService idempotencyClaimService;
+
     @BeforeEach
     @Transactional
     void setupGlobalMocks() {
@@ -38,7 +49,12 @@ public class TransferenciaServiceTest extends BaseMessagingTest {
         PanacheMock.mock(Conta.class);
         PanacheMock.mock(Transferencia.class);
 
-        when(Transferencia.findByIdempotencyKey(anyString())).thenReturn(null);
+        // Padrão: chave nova → prosseguir com a transferência
+        when(idempotencyClaimService.tryClaimKey(anyString())).thenReturn(true);
+
+        // Padrão: findByIdempotencyKey retorna um objeto real para que o serviço
+        // consiga preencher os campos (etapa 4 do fluxo) sem NPE
+        when(Transferencia.findByIdempotencyKey(anyString())).thenReturn(new Transferencia());
     }
 
     @Test
@@ -46,29 +62,23 @@ public class TransferenciaServiceTest extends BaseMessagingTest {
     @JwtSecurity(claims = { @Claim(key = "sub", value = USER_ID) })
     @DisplayName("Deve transferir com sucesso e persistir no Outbox")
     public void deveTransferirComSucesso() {
-        // Arrange
         Conta origem = TestDataFactory.contaPadraoOrigem();
         Conta destino = TestDataFactory.contaPadraoDestino();
-        mockContas(origem, destino); // Assume que este método configura o when() do PanacheMock
+        mockContas(origem, destino);
 
         TransferenciaDTO dto = TestDataFactory.novaTransferenciaDTO(
                 CONTA_ORIGEM, CONTA_DESTINO, new BigDecimal("100.00")
         );
 
-        // Act
         service.realizarTransferencia(dto);
 
-        // Assert
-        // Agora o count será sempre 1 porque limpamos no @BeforeEach
         Assertions.assertEquals(1, OutboxEvent.count(), "O evento de outbox deveria ter sido persistido");
-
-        // Validamos a lógica de negócio no objeto mockado
         Assertions.assertEquals(0, new BigDecimal("900.00").compareTo(origem.saldo));
     }
 
     @Test
-    @TestSecurity(user = "HACKER-ID", roles = "user") // 🛡️ Simula um invasor
-    @JwtSecurity(claims = { @Claim(key = "sub", value = USER_ID) }) // 🚀 E AQUI TAMBÉM!
+    @TestSecurity(user = "HACKER-ID", roles = "user")
+    @JwtSecurity(claims = { @Claim(key = "sub", value = USER_ID) })
     @DisplayName("Deve falhar por Acesso Negado")
     public void deveFalharAcessoNegado() {
         mockContas(TestDataFactory.contaPadraoOrigem(), TestDataFactory.contaPadraoDestino());
@@ -81,7 +91,7 @@ public class TransferenciaServiceTest extends BaseMessagingTest {
     }
 
     @Test
-    @TestSecurity(user = USER_ID, roles = "user") // 🛡️ Identidade correta, mas saldo baixo
+    @TestSecurity(user = USER_ID, roles = "user")
     @DisplayName("Deve falhar quando o saldo é insuficiente")
     public void deveFalharSaldoInsuficiente() {
         Conta origem = TestDataFactory.novaConta(CONTA_ORIGEM, USER_ID, new BigDecimal("50.00"));
@@ -122,11 +132,14 @@ public class TransferenciaServiceTest extends BaseMessagingTest {
     @TestSecurity(user = USER_ID, roles = "user")
     @DisplayName("Deve ignorar transferência se a chave de idempotência já existir")
     public void deveGarantirIdempotenciaNoService() {
+        // Simula: chave já reservada no banco (INSERT retornou 0 rows)
         TransferenciaDTO dto = TestDataFactory.novaTransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO, new BigDecimal("100.00"));
-        when(Transferencia.findByIdempotencyKey(dto.idempotencyKey())).thenReturn(new Transferencia());
+        when(idempotencyClaimService.tryClaimKey(dto.idempotencyKey())).thenReturn(false);
 
-        service.realizarTransferencia(dto);
+        boolean nova = service.realizarTransferencia(dto);
 
+        Assertions.assertFalse(nova, "Deve retornar false para indicar duplicata");
+        // Nenhuma operação financeira deve ter sido executada
         PanacheMock.verify(Conta.class, never()).findByNumeroWithLock(anyString());
         Assertions.assertTrue(connector.sink("transferencias-concluidas").received().isEmpty());
     }
@@ -136,3 +149,4 @@ public class TransferenciaServiceTest extends BaseMessagingTest {
         when(Conta.findByNumeroWithLock(destino.numero)).thenReturn(destino);
     }
 }
+

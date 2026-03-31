@@ -12,6 +12,8 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
+import java.util.Map;
+
 @Path("/api/transferencias")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -23,7 +25,12 @@ public class TransferenciaResource {
     @POST
     @RolesAllowed("user")
     public Response realizar(@Valid TransferenciaDTO dto) {
-        service.realizarTransferencia(dto);
-        return Response.status(Response.Status.CREATED).build();
+        boolean nova = service.realizarTransferencia(dto);
+        if (nova) {
+            return Response.status(Response.Status.CREATED).build();
+        }
+        // Chave idempotente já processada: retorna 200 (não 201) para indicar ao
+        // cliente que nenhuma nova transferência foi executada.
+        return Response.ok(Map.of("message", "Transferência já processada anteriormente.")).build();
     }
 }
