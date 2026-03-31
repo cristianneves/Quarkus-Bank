@@ -83,6 +83,56 @@ public class TransferenciaResourceTest extends BaseIntegrationTest {
         executarPost(dto).statusCode(401);
     }
 
+    @Test
+    @TestSecurity(user = USER_ID, roles = "user")
+    @JwtSecurity(claims = {
+            @Claim(key = "sub", value = USER_ID)
+    })
+    @DisplayName("Deve retornar 201 e depois 200 para a mesma chave (idempotência atômica)")
+    public void deveRetornar200ParaChaveIdempotenteDuplicada() {
+        // A chave é fixa — ambas as chamadas enviam exatamente o mesmo payload
+        TransferenciaDTO dto = new TransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO,
+                new BigDecimal("100.00"), "chave-idempotente-fixa-001");
+
+        // Primeira chamada: processa a transferência → 201 Created
+        executarPost(dto).statusCode(201);
+
+        // Segunda chamada com a mesma chave: idempotente → 200 OK (não debita novamente)
+        executarPost(dto)
+                .statusCode(200)
+                .body("message", org.hamcrest.Matchers.notNullValue());
+
+        // Saldo deve refletir apenas UMA transferência de R$ 100,00
+        validarSaldo(CONTA_ORIGEM, new BigDecimal("900.00"));
+        validarSaldo(CONTA_DESTINO, new BigDecimal("600.00"));
+    }
+
+    @Test
+    @TestSecurity(user = USER_ID, roles = "user")
+    @JwtSecurity(claims = {
+            @Claim(key = "sub", value = USER_ID)
+    })
+    @DisplayName("Chave de transferência com falha NÃO deve ser consumida (pode ser reusada)")
+    public void chaveDeTransferenciaFalhadaDevePermitirRetentativa() {
+        // Primeira tentativa: falha por saldo insuficiente → chave NÃO deve ficar retida
+        TransferenciaDTO dtoFalhado = new TransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO,
+                new BigDecimal("9999.00"), "chave-retry-001");
+
+        executarPost(dtoFalhado).statusCode(422);
+
+        // Saldos não devem ter sido alterados
+        validarSaldo(CONTA_ORIGEM, SALDO_PADRAO);
+
+        // Segunda tentativa com a mesma chave, mas valor correto → deve processar (201)
+        TransferenciaDTO dtoCorrigido = new TransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO,
+                new BigDecimal("50.00"), "chave-retry-001");
+
+        executarPost(dtoCorrigido).statusCode(201);
+
+        validarSaldo(CONTA_ORIGEM, new BigDecimal("950.00"));
+        validarSaldo(CONTA_DESTINO, new BigDecimal("550.00"));
+    }
+
     // --- AUXILIARES ---
     private TransferenciaDTO criarDTO(String o, String d, BigDecimal v) {
         return new TransferenciaDTO(o, d, v, UUID.randomUUID().toString());

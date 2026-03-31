@@ -22,33 +22,63 @@ public class TransferenciaService {
     @Inject
     ObjectMapper objectMapper;
 
+    @Inject
+    IdempotencyClaimService idempotencyClaimService;
+
+    /**
+     * Executa uma transferência de forma idempotente e segura contra condições de corrida.
+     *
+     * <p><b>Garantia de atomicidade:</b> A chave de idempotência é reservada via
+     * {@code INSERT ... ON CONFLICT DO NOTHING} antes de qualquer operação financeira.
+     * Dois threads concorrentes com a mesma chave nunca passarão desta etapa ao mesmo tempo:
+     * o PostgreSQL garante que apenas um INSERT terá {@code rowsAffected = 1}; o outro
+     * receberá {@code rowsAffected = 0} e retorna imediatamente sem duplicar a transferência.
+     * Ao contrário de SELECT → INSERT (check-then-act), esta abordagem não possui janela de
+     * corrida.</p>
+     *
+     * @return {@code true} quando a transferência foi processada agora (HTTP 201),
+     *         {@code false} quando a chave já existia (HTTP 200 — resposta idempotente).
+     */
     @Transactional
-    public void realizarTransferencia(TransferenciaDTO dto) {
-        // 1. Idempotência: Se já processamos essa chave, ignoramos silenciosamente
-        if (Transferencia.findByIdempotencyKey(dto.idempotencyKey()) != null) {
-            Log.warnf("⚠️ Transferência duplicada detectada: %s. Ignorando.", dto.idempotencyKey());
-            return;
+    public boolean realizarTransferencia(TransferenciaDTO dto) {
+
+        // ── 1. Reserva atômica da chave de idempotência ──────────────────────────────
+        // Delega ao IdempotencyClaimService (INSERT ... ON CONFLICT DO NOTHING).
+        // Lógica de concorrência documentada em IdempotencyClaimService.tryClaimKey().
+        if (!idempotencyClaimService.tryClaimKey(dto.idempotencyKey())) {
+            return false; // duplicata — caller retorna HTTP 200
         }
 
-        // 2. Lock Pessimista: Garante exclusividade sobre as contas durante a transação
+        // ── 2. Lock pessimista: exclusividade sobre as contas na transação ────────────
         Conta origem = Conta.findByNumeroWithLock(dto.numeroOrigem());
         Conta destino = Conta.findByNumeroWithLock(dto.numeroDestino());
 
         if (origem == null || destino == null) {
+            // Exceção não verificada → JTA faz rollback, liberando a chave de idempotência
             throw new BusinessException("Conta de origem ou destino não localizada.");
         }
 
         validarPropriedadeConta(origem);
 
+        // ── 3. Operações financeiras ──────────────────────────────────────────────────
         origem.debitar(dto.valor());
         destino.creditar(dto.valor());
 
-        Transferencia historico = criarHistorico(dto);
-        historico.persist();
+        // ── 4. Completar o registro pré-inserido com os dados da transferência ────────
+        // O INSERT da etapa 1 criou uma linha parcial (só id/key/status/dataHora).
+        // Agora atualizamos com os dados completos e marcamos como CONCLUIDA.
+        Transferencia historico = Transferencia.findByIdempotencyKey(dto.idempotencyKey());
+        historico.numeroOrigem  = dto.numeroOrigem();
+        historico.numeroDestino = dto.numeroDestino();
+        historico.valor         = dto.valor();
+        historico.dataHora      = LocalDateTime.now();
+        historico.status        = "CONCLUIDA";
 
+        // ── 5. Outbox (evento de domínio) ─────────────────────────────────────────────
         registrarEventoNoOutbox(dto);
 
-        Log.infof("✅ Transferência %s processada e evento registrado no Outbox.", dto.idempotencyKey());
+        Log.infof("✅ Transferência [%s] processada e evento registrado no Outbox.", dto.idempotencyKey());
+        return true; // nova — caller retorna HTTP 201
     }
 
     private void validarPropriedadeConta(Conta origem) {
@@ -66,16 +96,6 @@ public class TransferenciaService {
         }
     }
 
-    private Transferencia criarHistorico(TransferenciaDTO dto) {
-        Transferencia t = new Transferencia();
-        t.numeroOrigem = dto.numeroOrigem();
-        t.numeroDestino = dto.numeroDestino();
-        t.valor = dto.valor();
-        t.dataHora = LocalDateTime.now();
-        t.status = "CONCLUIDA";
-        t.idempotencyKey = dto.idempotencyKey();
-        return t;
-    }
 
     private void registrarEventoNoOutbox(TransferenciaDTO dto) {
         try {
