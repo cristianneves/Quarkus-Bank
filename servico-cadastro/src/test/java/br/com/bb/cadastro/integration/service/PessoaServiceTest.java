@@ -118,8 +118,8 @@ public class PessoaServiceTest extends BaseSecurityTest {
     }
 
     @Test
-    @DisplayName("Deve continuar exclusão mesmo se conta client falhar (por segurança)")
-    void deveContinuarExclusaoSeContaClientFalhar() {
+    @DisplayName("Deve abortar exclusão se conta client falhar (fail-closed)")
+    void deveAbortarExclusaoSeContaClientFalhar() {
         setupKeycloakMockSuccess();
         PessoaDTO dto = criarPessoaDTO();
         dto.email = "falha@bb.com.br";
@@ -127,10 +127,12 @@ public class PessoaServiceTest extends BaseSecurityTest {
         service.registrarNovoUsuario(dto);
         
         when(contaClient.obterSaldo(any())).thenThrow(new RuntimeException("Serviço indisponível"));
-        
-        service.excluirUsuarioCompleto(dto.email);
-        
-        assertEquals(0, Pessoa.count());
+
+        WebApplicationException ex = assertThrows(WebApplicationException.class,
+                () -> service.excluirUsuarioCompleto(dto.email));
+
+        assertEquals(Response.Status.SERVICE_UNAVAILABLE.getStatusCode(), ex.getResponse().getStatus());
+        assertEquals(1, Pessoa.count());
     }
 
     @Test
@@ -158,4 +160,5 @@ public class PessoaServiceTest extends BaseSecurityTest {
 
         assertThrows(RuntimeException.class, () -> service.registrarNovoUsuario(criarPessoaDTO()));
     }
+
 }

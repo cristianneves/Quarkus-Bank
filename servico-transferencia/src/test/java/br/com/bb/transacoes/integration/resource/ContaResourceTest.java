@@ -25,12 +25,14 @@ public class ContaResourceTest extends BaseIntegrationTest {
             Conta.deleteAll();
             Conta.getEntityManager().flush();
             TestDataFactory.contaPadraoOrigem().persist();
+            TestDataFactory.contaPadraoDestino().persist();
         });
     }
 
     @Test
-    @DisplayName("REST: Deve listar todas as contas")
-    public void deveListarContas() {
+    @TestSecurity(user = "admin-user", roles = "admin")
+    @DisplayName("REST: Admin deve listar todas as contas")
+    public void adminDeveListarContas() {
         given()
                 .when().get("/api/contas")
                 .then()
@@ -39,9 +41,18 @@ public class ContaResourceTest extends BaseIntegrationTest {
     }
 
     @Test
+    @DisplayName("REST: Deve retornar 401 ao listar contas sem autenticação")
+    public void deveRetornar401AoListarContasSemAuth() {
+        given()
+                .when().get("/api/contas")
+                .then()
+                .statusCode(401);
+    }
+
+    @Test
     @TestSecurity(user = USER_ID, roles = "user")
-    @DisplayName("REST: Deve buscar detalhes por KeycloakID")
-    public void deveBuscarPorId() {
+    @DisplayName("REST: Dono deve buscar detalhes por KeycloakID")
+    public void donoDeveBuscarPorId() {
         given()
                 .pathParam("keycloakId", USER_ID)
                 .when().get("/api/contas/detalhes/{keycloakId}")
@@ -53,8 +64,19 @@ public class ContaResourceTest extends BaseIntegrationTest {
 
     @Test
     @TestSecurity(user = USER_ID, roles = "user")
-    @DisplayName("REST: Deve retornar saldo por KeycloakID")
-    public void deveRetornarSaldo() {
+    @DisplayName("REST: Deve negar detalhes para conta de outro usuário")
+    public void deveNegarDetalhesParaOutraConta() {
+        given()
+                .pathParam("keycloakId", "user-destino-id")
+                .when().get("/api/contas/detalhes/{keycloakId}")
+                .then()
+                .statusCode(403);
+    }
+
+    @Test
+    @TestSecurity(user = USER_ID, roles = "user")
+    @DisplayName("REST: Dono deve retornar saldo por KeycloakID")
+    public void donoDeveRetornarSaldo() {
         given()
                 .pathParam("keycloakId", USER_ID)
                 .when().get("/api/contas/saldo/{keycloakId}")
@@ -64,6 +86,30 @@ public class ContaResourceTest extends BaseIntegrationTest {
     }
 
     @Test
+    @TestSecurity(user = USER_ID, roles = "user")
+    @DisplayName("REST: Deve negar saldo para conta de outro usuário")
+    public void deveNegarSaldoParaOutraConta() {
+        given()
+                .pathParam("keycloakId", "user-destino-id")
+                .when().get("/api/contas/saldo/{keycloakId}")
+                .then()
+                .statusCode(403);
+    }
+
+    @Test
+    @TestSecurity(user = "admin-user", roles = "admin")
+    @DisplayName("REST: Admin deve consultar saldo de qualquer conta")
+    public void adminDeveConsultarSaldoQualquerConta() {
+        given()
+                .pathParam("keycloakId", "user-destino-id")
+                .when().get("/api/contas/saldo/{keycloakId}")
+                .then()
+                .statusCode(200)
+                .body("saldo", notNullValue());
+    }
+
+    @Test
+    @TestSecurity(user = "admin-user", roles = "admin")
     @DisplayName("REST: Deve retornar 404 para conta inexistente")
     public void deveRetornar404ParaContaInexistente() {
         given()
