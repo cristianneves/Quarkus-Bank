@@ -160,4 +160,5 @@ public class PessoaServiceTest extends BaseSecurityTest {
 
         assertThrows(RuntimeException.class, () -> service.registrarNovoUsuario(criarPessoaDTO()));
     }
+
 }

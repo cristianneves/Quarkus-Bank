@@ -162,7 +162,8 @@ public class PessoaService {
             );
             event.persist();
         } catch (Exception e) {
-            Log.error("❌ Erro ao gerar Outbox", e);
+            Log.error("❌ Erro ao gerar Outbox. Operação será revertida para manter consistência.", e);
+            throw new IllegalStateException("Falha ao registrar evento no Outbox.", e);
         }
     }
 
