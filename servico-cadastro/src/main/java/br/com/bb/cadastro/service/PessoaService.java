@@ -121,7 +121,11 @@ public class PessoaService {
             }
         } catch (Exception e) {
             if (e instanceof WebApplicationException) throw e;
-            Log.error("⚠️ Não foi possível verificar o saldo, mas prosseguindo por segurança de teste.");
+            Log.error("⚠️ Não foi possível verificar o saldo. Exclusão abortada por segurança.", e);
+            throw new WebApplicationException(
+                    "Não foi possível validar o saldo da conta no momento. Tente novamente mais tarde.",
+                    Response.Status.SERVICE_UNAVAILABLE
+            );
         }
 
         String keycloakId = pessoa.keycloakId;

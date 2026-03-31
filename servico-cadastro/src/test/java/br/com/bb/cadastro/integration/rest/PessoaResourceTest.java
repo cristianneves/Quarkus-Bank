@@ -2,6 +2,7 @@ package br.com.bb.cadastro.integration.rest;
 
 import br.com.bb.cadastro.dto.PessoaDTO;
 import br.com.bb.cadastro.integration.base.BaseSecurityTest;
+import br.com.bb.cadastro.client.ContaClient;
 import br.com.bb.cadastro.model.OutboxEvent;
 import br.com.bb.cadastro.model.Pessoa;
 import br.com.bb.cadastro.service.PessoaService;
@@ -12,6 +13,7 @@ import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
+import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +22,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.mockito.Mockito.when;
+import java.util.Map;
 
 @QuarkusTest
 public class PessoaResourceTest extends BaseSecurityTest {
@@ -29,6 +32,10 @@ public class PessoaResourceTest extends BaseSecurityTest {
 
     @Inject
     PessoaService service;
+
+    @InjectMock
+    @RestClient
+    ContaClient contaClient;
 
     @BeforeEach
     @Transactional
@@ -94,6 +101,8 @@ public class PessoaResourceTest extends BaseSecurityTest {
         
         service.registrarNovoUsuario(dto);
 
+        when(contaClient.obterSaldo(USER_ID)).thenReturn(Map.of("saldo", "0.0"));
+
         RestAssured.given()
                 .when().delete("/api/pessoas/" + dto.email)
                 .then()
@@ -127,6 +136,26 @@ public class PessoaResourceTest extends BaseSecurityTest {
                 .when().delete("/api/pessoas/" + dto.email)
                 .then()
                 .statusCode(403);
+
+        Assertions.assertEquals(1, Pessoa.count());
+    }
+
+    @Test
+    @TestSecurity(user = "test-user", roles = {"user"})
+    @DisplayName("REST: Deve retornar 503 ao excluir quando validação de saldo está indisponível")
+    void deveRetornar503QuandoContaClientFalhaNoDelete() {
+        setupKeycloakMockSuccess();
+        mockJwtSubject(USER_ID);
+        PessoaDTO dto = criarPessoaDTO();
+        dto.email = "falha-delete@bb.com.br";
+
+        service.registrarNovoUsuario(dto);
+        when(contaClient.obterSaldo(USER_ID)).thenThrow(new RuntimeException("indisponivel"));
+
+        RestAssured.given()
+                .when().delete("/api/pessoas/" + dto.email)
+                .then()
+                .statusCode(503);
 
         Assertions.assertEquals(1, Pessoa.count());
     }
