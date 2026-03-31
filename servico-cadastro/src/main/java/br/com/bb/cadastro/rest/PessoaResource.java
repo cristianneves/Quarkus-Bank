@@ -5,8 +5,8 @@ import br.com.bb.cadastro.model.Pessoa;
 import br.com.bb.cadastro.service.PessoaService;
 import jakarta.annotation.security.PermitAll;
 import jakarta.annotation.security.RolesAllowed;
+import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.inject.Inject;
-import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -22,6 +22,8 @@ public class PessoaResource {
     JsonWebToken jwt;
     @Inject
     PessoaService pessoaService;
+    @Inject
+    SecurityIdentity identity;
 
     @POST
     @RolesAllowed("user")
@@ -44,8 +46,16 @@ public class PessoaResource {
 
     @DELETE
     @Path("/{email}")
-    @PermitAll
+    @RolesAllowed({"user", "admin"})
     public Response excluir(@PathParam("email") String email) {
+        Pessoa pessoa = Pessoa.find("email", email).firstResult();
+        if (pessoa != null && !identity.hasRole("admin")) {
+            String sub = jwt.getSubject();
+            if (sub == null || !sub.equals(pessoa.keycloakId)) {
+                throw new ForbiddenException("Acesso negado para excluir este usuário.");
+            }
+        }
+
         pessoaService.excluirUsuarioCompleto(email);
         return Response.noContent().build();
     }

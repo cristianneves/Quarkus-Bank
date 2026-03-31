@@ -84,9 +84,11 @@ public class PessoaResourceTest extends BaseSecurityTest {
     }
 
     @Test
+    @TestSecurity(user = "test-user", roles = {"user"})
     @DisplayName("REST: Deve excluir pessoa via DELETE")
     void deveExcluirPessoa() {
         setupKeycloakMockSuccess();
+        mockJwtSubject(USER_ID);
         PessoaDTO dto = criarPessoaDTO();
         dto.email = "excluir@bb.com.br";
         
@@ -101,11 +103,31 @@ public class PessoaResourceTest extends BaseSecurityTest {
     }
 
     @Test
+    @TestSecurity(user = "admin-user", roles = {"admin"})
     @DisplayName("REST: DELETE deve retornar 204 mesmo se pessoa não existir")
     void deveRetornar204QuandoPessoaNaoExiste() {
         RestAssured.given()
                 .when().delete("/api/pessoas/naoexiste@bb.com.br")
                 .then()
                 .statusCode(204);
+    }
+
+    @Test
+    @TestSecurity(user = "outro-user", roles = {"user"})
+    @DisplayName("REST: Deve negar exclusão quando usuário tentar remover outro cadastro")
+    void deveNegarExcluirOutroUsuario() {
+        setupKeycloakMockSuccess();
+        PessoaDTO dto = criarPessoaDTO();
+        dto.email = "owner@bb.com.br";
+
+        service.registrarNovoUsuario(dto);
+        mockJwtSubject("nao-dono");
+
+        RestAssured.given()
+                .when().delete("/api/pessoas/" + dto.email)
+                .then()
+                .statusCode(403);
+
+        Assertions.assertEquals(1, Pessoa.count());
     }
 }
