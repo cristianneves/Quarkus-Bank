@@ -2,30 +2,30 @@ package br.com.bb.transacoes.messaging;
 
 import br.com.bb.transacoes.dto.PessoaEventDTO;
 import br.com.bb.transacoes.model.Conta;
+import br.com.bb.transacoes.service.ContaNumberService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.logging.Log;
-import io.smallrye.common.annotation.Blocking; // 👈 Import correto
+import io.smallrye.common.annotation.Blocking;
 import io.smallrye.reactive.messaging.kafka.api.IncomingKafkaRecordMetadata;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
-import org.apache.kafka.common.header.Header;
 import org.eclipse.microprofile.reactive.messaging.Incoming;
 import org.eclipse.microprofile.reactive.messaging.Message;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
 import java.util.concurrent.CompletionStage;
 
 @ApplicationScoped
 public class ContaConsumer {
 
-    private static final SecureRandom RANDOM = new SecureRandom();
-
     @Inject
     ObjectMapper objectMapper;
+
+    @Inject
+    ContaNumberService contaNumberService;
 
     @Incoming("pessoa-registrada")
     @Transactional
@@ -64,7 +64,7 @@ public class ContaConsumer {
             novaConta.nomeTitular = evento.nome();
             novaConta.cpfTitular = evento.cpf();
             novaConta.emailTitular = evento.email();
-            novaConta.numero = gerarNumeroContaUnico();
+            novaConta.numero = contaNumberService.proximoNumeroConta();
             novaConta.saldo = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
 
             novaConta.persistAndFlush();
@@ -86,9 +86,5 @@ public class ContaConsumer {
         return metadata.getHeaders().lastHeader(key) != null
                 ? new String(metadata.getHeaders().lastHeader(key).value(), StandardCharsets.UTF_8)
                 : defaultValue;
-    }
-
-    private String gerarNumeroContaUnico() {
-        return String.valueOf(RANDOM.nextInt(900000) + 100000);
     }
 }
