@@ -21,6 +21,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.hamcrest.CoreMatchers.is;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import java.util.Map;
 
@@ -101,7 +103,7 @@ public class PessoaResourceTest extends BaseSecurityTest {
         
         service.registrarNovoUsuario(dto);
 
-        when(contaClient.obterSaldo(USER_ID)).thenReturn(Map.of("saldo", "0.0"));
+        when(contaClient.obterSaldo(eq(USER_ID), any())).thenReturn(Map.of("saldo", "0.0"));
 
         RestAssured.given()
                 .when().delete("/api/pessoas/" + dto.email)
@@ -150,7 +152,7 @@ public class PessoaResourceTest extends BaseSecurityTest {
         dto.email = "falha-delete@bb.com.br";
 
         service.registrarNovoUsuario(dto);
-        when(contaClient.obterSaldo(USER_ID)).thenThrow(new RuntimeException("indisponivel"));
+        when(contaClient.obterSaldo(eq(USER_ID), any())).thenThrow(new RuntimeException("indisponivel"));
 
         RestAssured.given()
                 .when().delete("/api/pessoas/" + dto.email)

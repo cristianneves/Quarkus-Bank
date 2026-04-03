@@ -21,5 +21,8 @@ public interface ContaClient {
 
     @GET
     @Path("/saldo/{keycloakId}")
-    Map<String, Object> obterSaldo(@PathParam("keycloakId") String keycloakId);
+    Map<String, Object> obterSaldo(
+            @PathParam("keycloakId") String keycloakId,
+            @HeaderParam("Authorization") String authHeader
+    );
 }

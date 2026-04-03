@@ -92,7 +92,7 @@ public class TransferenciaResourceTest extends BaseIntegrationTest {
     public void deveRetornar200ParaChaveIdempotenteDuplicada() {
         // A chave é fixa — ambas as chamadas enviam exatamente o mesmo payload
         TransferenciaDTO dto = new TransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO,
-                new BigDecimal("100.00"), "chave-idempotente-fixa-001");
+                new BigDecimal("100.00"), "chave-idempotente-fixa-001", null, null);
 
         // Primeira chamada: processa a transferência → 201 Created
         executarPost(dto).statusCode(201);
@@ -116,7 +116,7 @@ public class TransferenciaResourceTest extends BaseIntegrationTest {
     public void chaveDeTransferenciaFalhadaDevePermitirRetentativa() {
         // Primeira tentativa: falha por saldo insuficiente → chave NÃO deve ficar retida
         TransferenciaDTO dtoFalhado = new TransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO,
-                new BigDecimal("9999.00"), "chave-retry-001");
+                new BigDecimal("9999.00"), "chave-retry-001", null, null);
 
         executarPost(dtoFalhado).statusCode(422);
 
@@ -125,7 +125,7 @@ public class TransferenciaResourceTest extends BaseIntegrationTest {
 
         // Segunda tentativa com a mesma chave, mas valor correto → deve processar (201)
         TransferenciaDTO dtoCorrigido = new TransferenciaDTO(CONTA_ORIGEM, CONTA_DESTINO,
-                new BigDecimal("50.00"), "chave-retry-001");
+                new BigDecimal("50.00"), "chave-retry-001", null, null);
 
         executarPost(dtoCorrigido).statusCode(201);
 
@@ -135,7 +135,7 @@ public class TransferenciaResourceTest extends BaseIntegrationTest {
 
     // --- AUXILIARES ---
     private TransferenciaDTO criarDTO(String o, String d, BigDecimal v) {
-        return new TransferenciaDTO(o, d, v, UUID.randomUUID().toString());
+        return new TransferenciaDTO(o, d, v, UUID.randomUUID().toString(), null, null);
     }
 
     private io.restassured.response.ValidatableResponse executarPost(Object body) {
