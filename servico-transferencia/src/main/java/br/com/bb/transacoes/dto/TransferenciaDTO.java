@@ -15,5 +15,9 @@ public record TransferenciaDTO(
         @Positive(message = "O valor da transferência deve ser maior que zero")
         BigDecimal valor,
         @NotBlank(message = "A chave de idempotência é obrigatória")
-        String idempotencyKey
+        String idempotencyKey,
+
+        // Campos opcionais para enriquecimento do evento Kafka
+        String emailOrigem,
+        String emailDestino
 ) {}

@@ -92,7 +92,7 @@ public class PessoaServiceTest extends BaseSecurityTest {
         
         service.registrarNovoUsuario(dto);
         
-        when(contaClient.obterSaldo(any())).thenReturn(Map.of("saldo", "0.0"));
+        when(contaClient.obterSaldo(any(), any())).thenReturn(Map.of("saldo", "0.0"));
         
         service.excluirUsuarioCompleto(dto.email);
         
@@ -109,7 +109,7 @@ public class PessoaServiceTest extends BaseSecurityTest {
         
         service.registrarNovoUsuario(dto);
         
-        when(contaClient.obterSaldo(any())).thenReturn(Map.of("saldo", "100.50"));
+        when(contaClient.obterSaldo(any(), any())).thenReturn(Map.of("saldo", "100.50"));
         
         WebApplicationException ex = assertThrows(WebApplicationException.class, 
             () -> service.excluirUsuarioCompleto(dto.email));
@@ -126,7 +126,7 @@ public class PessoaServiceTest extends BaseSecurityTest {
         
         service.registrarNovoUsuario(dto);
         
-        when(contaClient.obterSaldo(any())).thenThrow(new RuntimeException("Serviço indisponível"));
+        when(contaClient.obterSaldo(any(), any())).thenThrow(new RuntimeException("Serviço indisponível"));
 
         WebApplicationException ex = assertThrows(WebApplicationException.class,
                 () -> service.excluirUsuarioCompleto(dto.email));

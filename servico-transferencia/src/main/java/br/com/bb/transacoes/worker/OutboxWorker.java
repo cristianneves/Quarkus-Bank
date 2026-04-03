@@ -9,6 +9,10 @@ import jakarta.transaction.Transactional;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
 
+import io.smallrye.reactive.messaging.kafka.api.OutgoingKafkaRecordMetadata;
+import org.apache.kafka.common.header.internals.RecordHeaders;
+import org.eclipse.microprofile.reactive.messaging.Message;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -32,19 +36,23 @@ public class OutboxWorker {
             try {
                 org.slf4j.MDC.put("correlationId", event.correlationId);
 
-                kafkaEmitter.send(event.payload)
-                        .toCompletableFuture()
-                        .get();
+                // Criar metadados com headers para o Kafka
+                OutgoingKafkaRecordMetadata<String> metadata = OutgoingKafkaRecordMetadata.<String>builder()
+                        .withHeaders(new RecordHeaders()
+                                .add("X-Correlation-ID", event.correlationId.getBytes())
+                                .add("X-Event-Type", event.type.getBytes()))
+                        .build();
+
+                // Envolver o payload em uma Message com os metadados
+                Message<String> message = Message.of(event.payload).addMetadata(metadata);
+
+                kafkaEmitter.send(message);
 
                 event.processedAt = LocalDateTime.now();
                 event.persist();
 
                 Log.infof("✅ [Outbox] Evento %s (%s) enviado ao Kafka.", event.id, event.aggregateId);
 
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                Log.error("🚨 [Outbox] Thread interrompida durante o processamento.");
-                break;
             } catch (Exception e) {
                 Log.errorf("❌ [Outbox] Falha ao enviar evento %s: %s. Re-tentativa em 10s.",
                         event.id, e.getMessage());

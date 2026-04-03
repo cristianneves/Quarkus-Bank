@@ -14,7 +14,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -116,6 +119,61 @@ public class ContaConsumerTest extends BaseMessagingTest {
 
         aguardarProcessamento(() -> {
             Assertions.assertEquals(1, Conta.count("keycloakId", id));
+        });
+    }
+
+    @Test
+    @DisplayName("Sequência: múltiplas contas devem ter números únicos (sem colisão)")
+    public void deveGerarNumerosDeContaUnicos() throws Exception {
+        // Garante que 5 aberturas de conta simultâneas nunca colidem —
+        // prova que a sequência DB substitui o SecureRandom aleatório.
+        List<String> userIds = List.of(
+                "seq-user-001", "seq-user-002", "seq-user-003",
+                "seq-user-004", "seq-user-005"
+        );
+
+        // Limpeza inicial
+        QuarkusTransaction.requiringNew().run(() ->
+                userIds.forEach(id -> Conta.delete("keycloakId", id))
+        );
+
+        for (String id : userIds) {
+            String json = objectMapper.writeValueAsString(
+                    TestDataFactory.novoEventoPessoa(id, "000.000.000-0" + userIds.indexOf(id)));
+            enviarMensagem(CANAL_ENTRADA, json);
+        }
+
+        aguardarProcessamento(() -> {
+            List<Conta> contas = Conta.list("keycloakId in ?1", userIds);
+            Assertions.assertEquals(userIds.size(), contas.size(),
+                    "Nem todas as contas foram criadas");
+
+            Set<String> numerosUnicos = contas.stream()
+                    .map(c -> c.numero)
+                    .collect(Collectors.toSet());
+
+            Assertions.assertEquals(userIds.size(), numerosUnicos.size(),
+                    "Colisão de número de conta detectada! números: " + numerosUnicos);
+        });
+    }
+
+    @Test
+    @DisplayName("Sequência: número de conta deve seguir o formato XXXXXX-D")
+    public void numeroDaContaDeveFollowFormato() throws Exception {
+        String id = "seq-format-user";
+        QuarkusTransaction.requiringNew().run(() -> Conta.delete("keycloakId", id));
+
+        String json = objectMapper.writeValueAsString(
+                TestDataFactory.novoEventoPessoa(id, "111.222.333-44"));
+        enviarMensagem(CANAL_ENTRADA, json);
+
+        aguardarProcessamento(() -> {
+            Conta conta = Conta.find("keycloakId", id).firstResult();
+            Assertions.assertNotNull(conta, "Conta não foi criada");
+            Assertions.assertTrue(
+                    conta.numero.matches("\\d{6}-\\d"),
+                    "Número fora do formato XXXXXX-D: " + conta.numero
+            );
         });
     }
 }

@@ -18,6 +18,14 @@ services:
           - /transferencias
         strip_path: false
 
+  - name: notificacao-service
+    url: http://host.docker.internal:8084
+    routes:
+      - name: rota-notificacoes
+        paths:
+          - /api/notificacoes
+        strip_path: false
+
 plugins:
   - name: correlation-id
     config:

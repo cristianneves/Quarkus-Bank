@@ -11,6 +11,7 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
+import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.keycloak.admin.client.CreatedResponseUtil;
 import org.keycloak.admin.client.Keycloak;
@@ -33,6 +34,9 @@ public class PessoaService {
     @Inject
     @RestClient
     ContaClient contaClient;
+
+    @Inject
+    JsonWebToken jwt;
 
     @Transactional
     public Pessoa registrarNovoUsuario(PessoaDTO dto) {
@@ -110,7 +114,8 @@ public class PessoaService {
         }
 
         try {
-            var resposta = contaClient.obterSaldo(pessoa.keycloakId);
+            String token = "Bearer " + jwt.getRawToken();
+            var resposta = contaClient.obterSaldo(pessoa.keycloakId, token);
             double saldo = Double.parseDouble(resposta.get("saldo").toString());
 
             if (saldo > 0) {
@@ -121,11 +126,17 @@ public class PessoaService {
             }
         } catch (Exception e) {
             if (e instanceof WebApplicationException) throw e;
-            Log.error("⚠️ Não foi possível verificar o saldo. Exclusão abortada por segurança.", e);
-            throw new WebApplicationException(
-                    "Não foi possível validar o saldo da conta no momento. Tente novamente mais tarde.",
-                    Response.Status.SERVICE_UNAVAILABLE
-            );
+            
+            // Se a conta não existir (404), podemos prosseguir com a exclusão da pessoa
+            if (e.getMessage() != null && e.getMessage().contains("404")) {
+                Log.infof("ℹ️ Conta não encontrada para %s. Prosseguindo com exclusão.", pessoa.keycloakId);
+            } else {
+                Log.error("⚠️ Não foi possível verificar o saldo. Exclusão abortada por segurança.", e);
+                throw new WebApplicationException(
+                        "Não foi possível validar o saldo da conta no momento. Tente novamente mais tarde.",
+                        Response.Status.SERVICE_UNAVAILABLE
+                );
+            }
         }
 
         String keycloakId = pessoa.keycloakId;

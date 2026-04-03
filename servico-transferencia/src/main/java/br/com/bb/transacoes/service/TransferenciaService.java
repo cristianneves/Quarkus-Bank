@@ -74,8 +74,16 @@ public class TransferenciaService {
         historico.dataHora      = LocalDateTime.now();
         historico.status        = "CONCLUIDA";
 
-        // ── 5. Outbox (evento de domínio) ─────────────────────────────────────────────
-        registrarEventoNoOutbox(dto);
+        // ── 5. Outbox (evento de domínio enriquecido) ─────────────────────────────
+        TransferenciaDTO eventoEnriquecido = new TransferenciaDTO(
+                dto.numeroOrigem(),
+                dto.numeroDestino(),
+                dto.valor(),
+                dto.idempotencyKey(),
+                origem.emailTitular,
+                destino.emailTitular
+        );
+        registrarEventoNoOutbox(eventoEnriquecido);
 
         Log.infof("✅ Transferência [%s] processada e evento registrado no Outbox.", dto.idempotencyKey());
         return true; // nova — caller retorna HTTP 201

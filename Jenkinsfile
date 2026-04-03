@@ -10,6 +10,7 @@ pipeline {
 
 		URL_CADASTRO = "jdbc:postgresql://db-cadastro:5432/cadastro_db"
 		URL_TRANSFERENCIA = "jdbc:postgresql://db-transferencia:5432/transferencia_db"
+		URL_NOTIFICACAO = "jdbc:postgresql://db-notificacoes:5432/notificacao_db"
 		OIDC_URL = "http://keycloak-estavel:8080/realms/bank-realm"
 		KAFKA_URL = "redpanda-estavel:29092"
 
@@ -45,6 +46,19 @@ pipeline {
 			}
 		}
 
+		stage('Build & Test: Notificações') {
+			steps {
+				dir('servico-notificacoes') {
+					sh "mvn clean verify \
+                    -Dquarkus.datasource.jdbc.url=${env.URL_NOTIFICACAO} \
+                    -Dquarkus.oidc.auth-server-url=${env.OIDC_URL} \
+                    -Dkafka.bootstrap.servers=${env.KAFKA_URL} \
+                    -Dquarkus.datasource.username=${env.DB_USER} \
+                    -Dquarkus.datasource.password=${env.DB_PASS}"
+				}
+			}
+		}
+
 		stage('Sonar: Cadastro') {
 			steps {
 				dir('servico-cadastro') {
@@ -66,6 +80,19 @@ pipeline {
 						sh "chmod +x ./mvnw && ./mvnw sonar:sonar -Dsonar.projectKey=servico-transferencia"
 					}
 					// 🎯 O isolamento do 'dir' e do estágio força o Jenkins a pegar o ID 'AZy2dzFkJnEsPQrVi_TT'
+					timeout(time: 5, unit: 'MINUTES') {
+						waitForQualityGate abortPipeline: true
+					}
+				}
+			}
+		}
+
+		stage('Sonar: Notificações') {
+			steps {
+				dir('servico-notificacoes') {
+					withSonarQubeEnv('SonarQubeServer') {
+						sh "chmod +x ./mvnw && ./mvnw sonar:sonar -Dsonar.projectKey=servico-notificacoes"
+					}
 					timeout(time: 5, unit: 'MINUTES') {
 						waitForQualityGate abortPipeline: true
 					}
