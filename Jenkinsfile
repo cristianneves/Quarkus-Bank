@@ -10,7 +10,7 @@ pipeline {
 
 		URL_CADASTRO = "jdbc:postgresql://db-cadastro:5432/cadastro_db"
 		URL_TRANSFERENCIA = "jdbc:postgresql://db-transferencia:5432/transferencia_db"
-		URL_NOTIFICACAO = "jdbc:postgresql://db-notificacao:5432/notificacao_db"
+		URL_NOTIFICACAO = "jdbc:postgresql://db-notificacoes:5432/notificacao_db"
 		OIDC_URL = "http://keycloak-estavel:8080/realms/bank-realm"
 		KAFKA_URL = "redpanda-estavel:29092"
 
