@@ -26,4 +26,15 @@ public class Pessoa extends PanacheEntity {
     @NotBlank
     @Column(unique = true, nullable = false)
     public String keycloakId; // 🔑 O 'sub' que vem no Token JWT
+
+    @Override
+    public String toString() {
+        return "Pessoa{" +
+                "id=" + id +
+                ", nome='" + nome + '\'' +
+                ", cpf='***.***.***-**'" +
+                ", email='[MASKED]'" +
+                ", keycloakId='" + keycloakId + '\'' +
+                '}';
+    }
 }
