@@ -16,6 +16,7 @@ pipeline {
 
 		DB_USER = "admin"
 		DB_PASS = "admin"
+		TESTCONTAINERS_RYUK_DISABLED = "true"
 	}
 
 	stages {
