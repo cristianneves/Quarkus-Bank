@@ -7,11 +7,10 @@ services:
     environment:
       KONG_DATABASE: "off"
       KONG_DECLARATIVE_CONFIG: /usr/local/kong/declarative/kong.yml
-      # ... (logs simplificados para o exemplo)
     volumes:
       - ./kong:/usr/local/kong/declarative
     ports:
-      - "8000:8000" # ÚNICA PORTA DE ENTRADA PARA A API
+      - "8000:8000"
       - "8001:8001"
     networks:
       - bank-network
@@ -27,15 +26,21 @@ services:
     environment:
       - DB_HOST=db-cadastro
       - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - KC_ADMIN_USER=${KC_ADMIN_USER}
+      - KC_ADMIN_PASS=${KC_ADMIN_PASS}
       - KAFKA_URL=redpanda-estavel:29092
       - KC_URL=http://keycloak-estavel:8080
+      - VAULT_URL=http://vault-estavel:8200
+      - VAULT_TOKEN=${VAULT_TOKEN}
     networks:
       - bank-network
     depends_on:
       - db-cadastro
 
   servico-transferencia:
-    profiles: [ "apps" ] # 👈 Só sobe com --profile apps
+    profiles: [ "apps" ]
     build:
       context: ./servico-transferencia
       dockerfile: Dockerfile
@@ -43,8 +48,12 @@ services:
     environment:
       - DB_HOST=db-transferencia
       - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
       - KAFKA_URL=redpanda-estavel:29092
       - KC_URL=http://keycloak-estavel:8080
+      - VAULT_URL=http://vault-estavel:8200
+      - VAULT_TOKEN=${VAULT_TOKEN}
     networks:
       - bank-network
     depends_on:
@@ -59,22 +68,25 @@ services:
     environment:
       - DB_HOST=db-notificacoes
       - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
       - KAFKA_URL=redpanda-estavel:29092
       - KC_URL=http://keycloak-estavel:8080
+      - VAULT_URL=http://vault-estavel:8200
+      - VAULT_TOKEN=${VAULT_TOKEN}
     networks:
       - bank-network
     depends_on:
       - db-notificacoes
       - redpanda
 
-  # Base de dados exclusiva para o Cadastro (Porto 5432)
   db-cadastro:
     image: postgres:17
     container_name: db-cadastro
     environment:
       - POSTGRES_DB=cadastro_db
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=admin
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASS}
     ports:
       - "5432:5432"
     volumes:
@@ -82,14 +94,13 @@ services:
     networks:
       - bank-network
 
-    # Base de dados exclusiva para Transferências (Porto 5433)
   db-transferencia:
     image: postgres:17
     container_name: db-transferencia
     environment:
       - POSTGRES_DB=transferencia_db
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=admin
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASS}
     ports:
       - "5433:5432"
     volumes:
@@ -102,8 +113,8 @@ services:
     container_name: db-notificacoes
     environment:
       - POSTGRES_DB=notificacao_db
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=admin
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASS}
     ports:
       - "5435:5432"
     volumes:
@@ -116,8 +127,8 @@ services:
     container_name: db-keycloak
     environment:
       - POSTGRES_DB=keycloak_db
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=admin
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASS}
     ports:
       - "5434:5432"
     volumes:
@@ -128,18 +139,18 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0.0
     container_name: keycloak-estavel
-    command: start-dev --db=postgres --db-url=jdbc:postgresql://db-keycloak:5432/keycloak_db --db-username=admin --db-password=admin
+    command: start-dev --db=postgres --db-url=jdbc:postgresql://db-keycloak:5432/keycloak_db --db-username=${DB_USER} --db-password=${DB_PASS}
     depends_on:
       - db-keycloak
     environment:
-      KC_BOOTSTRAP_ADMIN_USERNAME: admin
-      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN_USER}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASS}
     ports:
       - "8180:8080"
     networks:
       - bank-network
 
-  redpanda: # Kafka
+  redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:v24.1.2
     container_name: redpanda-estavel
     command:
@@ -177,6 +188,19 @@ services:
       - sonarqube_data:/opt/sonarqube/data
     networks:
       - bank-network
+
+  vault-estavel:
+    image: hashicorp/vault:latest
+    container_name: vault-estavel
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN}
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    ports:
+      - "8200:8200"
+    networks:
+      - bank-network
+    cap_add:
+      - IPC_LOCK
 
 networks:
   bank-network:

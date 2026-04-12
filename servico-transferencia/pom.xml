@@ -18,11 +18,9 @@
         <surefire-plugin.version>3.5.4</surefire-plugin.version>
         <sonar.host.url>http://localhost:9000</sonar.host.url>
         <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/jacoco-reports/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
-        <sonar.exclusions>
-            src/main/java/br/com/bb/transacoes/model/**,
+        <sonar.exclusions>src/main/java/br/com/bb/transacoes/model/**,
             src/main/java/br/com/bb/transacoes/serialization/**,
-            src/main/java/br/com/bb/transacoes/dto/**
-        </sonar.exclusions>
+            src/main/java/br/com/bb/transacoes/dto/**</sonar.exclusions>
     </properties>
 
     <dependencyManagement>
@@ -73,6 +71,10 @@
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-oidc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkiverse.vault</groupId>
+            <artifactId>quarkus-vault</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>

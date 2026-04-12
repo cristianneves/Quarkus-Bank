@@ -19,4 +19,13 @@ public class PessoaDTO {
     
     @NotBlank
     public String password;
+
+    @Override
+    public String toString() {
+        return "PessoaDTO{" +
+                "nome='" + nome + '\'' +
+                ", cpf='***.***.***-**'" +
+                ", email='[MASKED]'" +
+                '}';
+    }
 }

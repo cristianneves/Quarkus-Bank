@@ -16,6 +16,8 @@ pipeline {
 
 		DB_USER = "admin"
 		DB_PASS = "admin"
+		TESTCONTAINERS_RYUK_DISABLED = "true"
+		QUARKUS_VAULT_DEVSERVICES_ENABLED = "false"
 	}
 
 	stages {
