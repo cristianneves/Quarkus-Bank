@@ -26,7 +26,6 @@ public class PessoaDTO {
                 "nome='" + nome + '\'' +
                 ", cpf='***.***.***-**'" +
                 ", email='[MASKED]'" +
-                ", pwd='***'" +
                 '}';
     }
 }
